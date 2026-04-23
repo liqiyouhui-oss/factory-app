@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+<title>工程管理システム</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#0d1117;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;font-size:15px;min-height:100vh;padding-bottom:80px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes glow{0%,100%{box-shadow:0 0 20px #6366f128}50%{box-shadow:0 0 44px #6366f165}}
+@keyframes alarm-flash{0%,100%{opacity:1}50%{opacity:.6}}
+.spin{animation:spin 8s linear infinite;display:inline-block}
+.up{animation:up .25s ease}
+.pulse{animation:pulse 1.8s ease infinite}
+input,textarea,select{background:#0d1117;border:1px solid #30363d;border-radius:7px;color:#e2e8f0;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;width:100%}
+input:focus,textarea:focus,select:focus{border-color:#6366f1;box-shadow:0 0 0 2px #6366f118}
+input[type=checkbox]{width:18px;height:18px;accent-color:#6366f1;cursor:pointer}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%2364748b' d='M5 7L0 2h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#0d1117}
+::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+.card{background:#161b22;border:1px solid #21262d;border-radius:12px;padding:16px;margin-bottom:12px}
+.hdr{background:linear-gradient(90deg,#1e1b4b,#1e293b);border-bottom:1px solid #334155;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:99}
+.wrap{max-width:880px;margin:0 auto;padding:12px 10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.lbl{color:#475569;font-size:12px;font-weight:700;display:block;margin-bottom:5px;letter-spacing:1px}
+.tag{border-radius:6px;padding:3px 9px;font-size:12px;font-weight:700;white-space:nowrap}
+.btn-p{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border-radius:11px;padding:13px;font-weight:800;font-size:15px;border:none}
+.btn-s{background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:10px;padding:12px;font-weight:700;font-size:15px}
+.btn-d{background:#2d0a0a;border:1px solid #ef4444;color:#f87171;border-radius:10px;padding:10px 16px;font-weight:700}
+.btn-xs{background:#1e293b;border:1px solid #30363d;color:#94a3b8;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600}
+.tog{border-radius:14px;padding:4px 14px;font-size:12px;font-weight:700;min-width:50px;transition:all .2s}
+.step-c{background:#0a0f18;border:1px solid #21262d;border-radius:9px;padding:14px;margin-bottom:8px}
+.dl-over{color:#ef4444!important;background:#450a0a!important}
+.dl-urgent{color:#f97316!important;background:#431407!important}
+.dl-warn{color:#eab308!important;background:#422006!important}
+.dl-ok{color:#22d3ee!important;background:#0c1a1f!important}
+.dl-done{color:#10b981!important;background:#052e16!important}
+.dl-none{color:#475569!important;background:#1e293b!important}
+.feas-ok{color:#10b981}.feas-tight{color:#f59e0b}.feas-ng{color:#ef4444}
+.remain-card{background:#0d1117;border:1px solid #21262d;border-radius:12px;padding:16px;margin-bottom:10px}
+.remain-val{font-size:28px;font-weight:900;line-height:1}
+.remain-lbl{font-size:12px;color:#64748b;margin-top:4px;letter-spacing:1px}
+.risk-ok{color:#10b981;font-size:18px;font-weight:900}
+.risk-warn{color:#f59e0b;font-size:18px;font-weight:900}
+.risk-ng{color:#ef4444;font-size:18px;font-weight:900}
+.team-tab-row{display:flex;background:#161b22;border:1px solid #21262d;border-radius:9px;overflow:hidden;margin-bottom:10px}
+.team-tab-row button{flex:1;background:transparent;border:none;color:#64748b;padding:9px 4px;font-weight:700;font-size:13px}
+.team-tab-row button.active{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff}
+.calc-toggle{background:none;border:1px solid #30363d;border-radius:8px;color:#64748b;font-size:12px;padding:6px 12px;width:100%;text-align:left;margin-top:8px}
+.calc-detail{display:none;background:#0a0f18;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;color:#94a3b8;line-height:1.8}
+.calc-detail.open{display:block}
+.bnav{position:fixed;bottom:0;left:0;right:0;background:#161b22;border-top:1px solid #21262d;display:flex;z-index:100;height:60px}
+.bnav button{flex:1;background:none;border:none;color:#64748b;font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;transition:color .15s}
+.bnav button.active{color:#6366f1}
+.bnav button span.ico{font-size:20px;line-height:1}
+.role-shokucho{background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b40}
+.role-hancho{background:#6366f122;color:#818cf8;border:1px solid #6366f140}
+.role-worker{background:#21262d;color:#64748b;border:1px solid #30363d}
+.cal-day{min-height:60px;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:4px 5px;cursor:pointer;transition:background .12s}
+.cal-day:hover{background:#1e293b}
+.cal-day.today{border-color:#6366f1;background:#1e1b4b22}
+.cal-day.holiday{background:#2d0a0a}
+.cal-day.other-month{opacity:.35}
+.cal-day .cal-num{font-size:12px;font-weight:700;color:#94a3b8}
+.cal-day.today .cal-num{color:#6366f1}
+.cal-day.holiday .cal-num{color:#ef4444}
+#alarm-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:200;padding:10px 16px;text-align:center;font-weight:700;font-size:13px;animation:alarm-flash 1s ease infinite}
+#alarm-banner.over{background:#450a0a;color:#f87171;border-bottom:2px solid #ef4444}
+#alarm-banner.urgent{background:#431407;color:#fb923c;border-bottom:2px solid #f97316}
+.flow-wrap{overflow-x:auto;padding-bottom:8px}
+.flow-row{display:flex;align-items:center;gap:0;min-width:max-content;padding:4px 0}
+.flow-node{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:10px 12px;min-width:120px;max-width:150px;position:relative;flex-shrink:0}
+.flow-node.g1{border-top:3px solid #6366f1}
+.flow-node.g2{border-top:3px solid #06b6d4}
+.flow-node.option-node{background:#0d1117;border-style:dashed;min-width:80px;max-width:100px;text-align:center}
+.flow-arrow{color:#334155;font-size:20px;padding:0 4px;flex-shrink:0}
+.flow-prog-bar{height:4px;background:#1e293b;border-radius:99px;overflow:hidden;margin-top:6px}
+.flow-prog-inner{height:100%;border-radius:99px;transition:width .3s}
+.group-box{border-radius:12px;padding:14px;margin-bottom:10px}
+.group-box.g1-box{background:#1a1b2e;border:1px solid #6366f140}
+.group-box.g2-box{background:#0a1a2e;border:1px solid #06b6d440}
+.group-label{font-size:11px;font-weight:700;letter-spacing:2px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.opt-divider{background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:12px;margin:10px 0}
+.date-selects{display:flex;gap:6px;align-items:center}
+.date-selects select{flex:1}
+.storage-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.storage-row label{flex:1.2;color:#94a3b8;font-size:13px;font-weight:700}
+.storage-row input{flex:1;text-align:center;font-size:15px;font-weight:700}
+.storage-del{background:#2d0a0a;border:1px solid #ef444460;color:#f87171;border-radius:6px;padding:7px 11px;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0}
+.storage-del:hover{background:#450a0a}
+</style>
+</head>
+<body>
+<div id="alarm-banner">
+  <span id="alarm-msg"></span>
+  &nbsp;&nbsp;
+  <button onclick="dismissAlarm()" style="background:#ffffff22;border:1px solid #ffffff44;border-radius:6px;color:inherit;padding:3px 12px;font-size:12px;font-weight:700;cursor:pointer">確認した</button>
+  &nbsp;
+  <button onclick="toggleAlarmSetting()" id="alarm-toggle-btn" style="background:#ffffff11;border:1px solid #ffffff33;border-radius:6px;color:inherit;padding:3px 12px;font-size:12px;cursor:pointer"></button>
+</div>
+<div id="app"></div>
+<script>
+/* ============================================================
+   工程管理アプリ フロントエンド v2 (Python+Excel版)
+   改修項目：
+     ① 加工②が空ならプレビューで非表示
+     ② 保守値の表示改善（空工程の場合は単一時間表示）
+     ④ 置き場在庫×削除、「未投入」表記削除
+     ⑤ 日報に残業時間欄、マスタから残業削除
+     ⑥ 納期閾値変更（余裕:30+日、注意:14-30日、要注意:0-14日）
+     ⑦ 社内検査→立会検査の順に変更
+     ⑧ 保守値を目立たせる表示
+   ============================================================ */
+
+const PASS='1234';
+const SK='factory_py_v1', MK='factory_masters_v1', TK='factory_time_v1', DK='factory_daily_v1', CK='factory_cal_v1';
+const ALARM_KEY='factory_alarm_setting', ALARM_DISMISS_KEY='factory_alarm_dismiss';
+const TEAMS=['1班','2班','3班'];
+const ROLES=['職長','班長','作業員'];
+const SKILL_LABELS=['','見習い','初級','中級','上級','エキスパート'];
+const TEAM_COLORS={'1班':'#6366f1','2班':'#06b6d4','3班':'#10b981','':'#334155'};
+const ROLE_CLS={'職長':'role-shokucho','班長':'role-hancho','作業員':'role-worker'};
+const STORAGE_PLACES=['東工場','整正場','D倉庫','サンドブラスト'];
+
+/* ===== HELPERS ===== */
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const addDays=(d,n)=>{try{const x=new Date(d);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)}catch(e){return d}};
+const diffDays=d=>{if(!d)return null;try{return Math.ceil((new Date(d)-new Date(todayStr()))/(864e5))}catch(e){return null}};
+const fmt=d=>{if(!d||typeof d!=='string')return'未設定';const p=d.split('-');if(p.length<3)return'未設定';return`${p[1]}/${p[2]}`};
+const fmtFull=d=>{if(!d||typeof d!=='string')return'未設定';const p=d.split('-');if(p.length<3)return'未設定';return`${p[0]}/${p[1]}/${p[2]}`};
+const fmtMD=d=>{if(!d||typeof d!=='string')return'―';const p=d.split('-');if(p.length<3)return'―';const dw=['日','月','火','水','木','金','土'][new Date(d+'T00:00:00').getDay()];return`${parseInt(p[1])}/${parseInt(p[2])}(${dw})`};
+const hhmm=h=>{if(!h||h<=0)return'―';const hh=Math.floor(h);const mm=Math.round((h-hh)*60);return mm>0?`${hh}h${mm}m`:`${hh}h`};
+const toMin=t=>{if(!t)return 0;const p=t.split(':');if(p.length<2)return 0;return(parseInt(p[0])||0)*60+(parseInt(p[1])||0)};
+let _uid=Date.now();
+const uid=()=>++_uid;
+const esc=s=>{if(s===null||s===undefined)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')};
+
+/* 【指摘A】休日判定：日曜日 または カレンダーで休日設定された日 */
+const isHoliday=d=>{
+  if(!d||typeof d!=='string')return false;
+  try{
+    /* 日曜日は常に休日 */
+    const dow=new Date(d+'T00:00:00').getDay();
+    if(dow===0)return true;
+    /* カレンダーの休日イベントを参照 */
+    return (calEvents||[]).some(e=>e.date===d&&e.type==='holiday');
+  }catch(e){return false;}
+};
+
+/* 【指摘A】稼働日数の残り：今日から指定日まで、休日を除外した日数 */
+const workingDaysUntil=d=>{
+  if(!d||typeof d!=='string')return null;
+  try{
+    const total=diffDays(d);
+    if(total===null)return null;
+    /* 0日以下なら休日計算せずそのまま返す（超過扱い） */
+    if(total<=0)return total;
+    let count=0;
+    const today=todayStr();
+    for(let i=1;i<=total;i++){
+      const chk=addDays(today,i);
+      if(!isHoliday(chk))count++;
+    }
+    return count;
+  }catch(e){return null;}
+};
+
+/* 【指摘D】指定時間後に完了する日付を「稼働日」ベースで計算
+   totalH = 必要な合計時間(h)
+   dh = 1日の実稼働時間(h) */
+const calcFinishDate=(totalH,dh)=>{
+  if(!totalH||totalH<=0||!dh||dh<=0)return '';
+  try{
+    const reqDays=Math.ceil(totalH/dh);
+    const today=todayStr();
+    let count=0;
+    let cur=today;
+    let safety=0;
+    /* 最大1000日まで探索 */
+    while(count<reqDays&&safety<1000){
+      cur=addDays(cur,1);
+      if(!isHoliday(cur))count++;
+      safety++;
+    }
+    return cur;
+  }catch(e){return '';}
+};
+
+/* 日付セレクト: value が空なら「未選択」状態にする（ユーザーに選択を促す）
+   data-key で S.form のキー名を指定すると、変更時に S.form へ自動反映する */
+function makeDateSelects(prefix,val,formKey){
+  const today=new Date();
+  let y='',m='',d='';
+  const hasVal=val&&typeof val==='string'&&val.length>=8;
+  if(hasVal){
+    const p=val.split('-');
+    if(p.length>=3){y=parseInt(p[0])||'';m=parseInt(p[1])||'';d=parseInt(p[2])||'';}
+  }
+  const curY=today.getFullYear();
+  const keyAttr=formKey?` data-formkey="${formKey}"`:'';
+  let ys=`<option value="">年</option>`;for(let i=curY-1;i<=curY+5;i++)ys+=`<option value="${i}"${y===i?' selected':''}>${i}年</option>`;
+  let ms=`<option value="">月</option>`;for(let i=1;i<=12;i++)ms+=`<option value="${i}"${m===i?' selected':''}>${i}月</option>`;
+  let ds=`<option value="">日</option>`;for(let i=1;i<=31;i++)ds+=`<option value="${i}"${d===i?' selected':''}>${i}日</option>`;
+  return `<div class="date-selects">
+    <select id="${prefix}-y" class="date-sel"${keyAttr} data-prefix="${prefix}">${ys}</select>
+    <select id="${prefix}-m" class="date-sel"${keyAttr} data-prefix="${prefix}" style="flex:.7">${ms}</select>
+    <select id="${prefix}-d" class="date-sel"${keyAttr} data-prefix="${prefix}" style="flex:.6">${ds}</select>
+  </div>`;
+}
+function getDateVal(prefix){
+  const yEl=document.getElementById(`${prefix}-y`);
+  const mEl=document.getElementById(`${prefix}-m`);
+  const dEl=document.getElementById(`${prefix}-d`);
+  if(!yEl||!mEl||!dEl)return'';
+  const y=yEl.value;const m=String(mEl.value||'').padStart(2,'0');const d=String(dEl.value||'').padStart(2,'0');
+  return y&&m&&d?`${y}-${m}-${d}`:'';
+}
+window.adjustDays=prefix=>{
+  try{
+    const yEl=document.getElementById(`${prefix}-y`);
+    const mEl=document.getElementById(`${prefix}-m`);
+    const dSel=document.getElementById(`${prefix}-d`);
+    if(!yEl||!mEl||!dSel)return;
+    const y=parseInt(yEl.value||new Date().getFullYear());
+    const m=parseInt(mEl.value||1);
+    const maxD=new Date(y,m,0).getDate();
+    const cur=parseInt(dSel.value)||1;
+    const newD=cur>maxD?maxD:cur;
+    let opts='';for(let i=1;i<=maxD;i++)opts+=`<option value="${i}"${i===newD?' selected':''}>${i}日</option>`;
+    dSel.innerHTML=opts;
+  }catch(e){console.error('adjustDays error:',e);}
+};
+
+async function apiGet(key){
+  try{const r=await fetch('/api/data/'+encodeURIComponent(key));if(!r.ok)return null;const d=await r.json();return d.ok?d.value:null;}
+  catch(e){console.error('[apiGet]',key,e);return null;}
+}
+function apiSet(key,value){
+  try{fetch('/api/data/'+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value})}).catch(e=>console.error('[apiSet]',key,e));}
+  catch(e){console.error('[apiSet] sync error:',e);}
+}
+
+/* ===== MASTERS ===== */
+/* 【改修⑤】workSettings から overtime を削除（残業時間は日報で管理） */
+const defMasters=()=>({
+  workers:[],machines:[],
+  workSettings:{startTime:'08:00',endTime:'17:00',breaks:[
+    {id:1,start:'10:00',end:'10:10'},
+    {id:2,start:'12:00',end:'12:45'},
+    {id:3,start:'15:00',end:'15:10'}
+  ]}
+});
+
+/* 既存の breaks に 12:00-12:45 が無ければ自動追加 */
+const migrateBreaks=ws=>{
+  if(!ws||!Array.isArray(ws.breaks))return ws;
+  const has=ws.breaks.some(b=>b.start==='12:00'&&b.end==='12:45');
+  if(!has){
+    const maxId=ws.breaks.reduce((m,b)=>Math.max(m,parseInt(b.id)||0),0);
+    ws.breaks.push({id:maxId+1,start:'12:00',end:'12:45'});
+    /* 開始時刻でソート */
+    ws.breaks.sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  }
+  return ws;
+};
+let masters=defMasters();
+const saveMasters=()=>apiSet(MK,masters);
+/* 【改修⑤】残業時間は勤務設定には含めない（日報で管理）。calcDailyHは勤務時間のみ */
+const calcDailyH=()=>{
+  try{
+    const ws=masters.workSettings||{};
+    let t=toMin(ws.endTime||'17:00')-toMin(ws.startTime||'08:00');
+    (ws.breaks||[]).forEach(b=>{t-=toMin(b.end)-toMin(b.start);});
+    return Math.max(0,t/60);
+  }catch(e){console.error('calcDailyH error:',e);return 8;}
+};
+const machineName=id=>{const m=(masters.machines||[]).find(x=>x.id==id);return m?m.name:'';};
+const workerById=id=>(masters.workers||[]).find(w=>w.id==id)||null;
+const workerName=id=>{const w=workerById(id);return w?w.name:'';};
+
+/* ===== TIME HINTS ===== */
+let timeDB={};
+const saveTDB=()=>apiSet(TK,timeDB);
+
+/* ===== ORDERS ===== */
+const defStep=name=>({id:uid(),name:name||'加工',machineId:'',operatorId:'',machineCount:1,hoursPerUnit:'',done:0,actualHours:''});
+
+const blankOrder=()=>({
+  id:uid(),seiban:'',client:'',product:'',productId:'',material:'',qty:'',
+  deadline:'',note:'',
+  group1:[defStep('加工１')],
+  group2:[defStep('加工２')],
+  heatTreat:false,heatTreatReturnDate:'',
+  outsource:false,outsourceReturnDate:'',
+  inspection:false,inspectionDate:'',
+  internalInspection:false,internalInspectionDate:'',
+  storageQty:{},
+  caution:false,cautionNote:'',
+  at:new Date().toISOString()
+});
+
+/* 旧データのマイグレーション */
+const migrate=o=>{
+  if(!o||typeof o!=='object')return blankOrder();
+  const base={...o};
+  if(!Array.isArray(o.group1)||!Array.isArray(o.group2)){
+    const steps=Array.isArray(o.steps)?o.steps:[];
+    base.group1=steps.length>0?[{...steps[0]}]:[defStep('加工１')];
+    base.group2=steps.length>1?steps.slice(1).map(s=>({...s})):[defStep('加工２')];
+    delete base.steps;delete base.polish;
+  }
+  if(base.heatTreatReturnDate===undefined)base.heatTreatReturnDate='';
+  if(base.outsourceReturnDate===undefined)base.outsourceReturnDate='';
+  if(!base.storageQty||typeof base.storageQty!=='object')base.storageQty={};
+  if(base.product===undefined)base.product='';
+  if(base.productId===undefined)base.productId='';
+  return base;
+};
+
+let orders=[];
+const persist=()=>apiSet(SK,orders);
+
+/* 【改修①】加工②が実質的に空かどうかを判定する関数（hoursPerUnitが全部空） */
+const hasGroup2=o=>{
+  const g2=o.group2||[];
+  if(!g2.length)return false;
+  return g2.some(s=>{
+    const h=parseFloat(s.hoursPerUnit);
+    return !isNaN(h)&&h>0;
+  });
+};
+
+/* 完了判定 */
+const isDone=o=>{
+  const q=parseInt(o.qty)||0;
+  if(!q)return false;
+  let allSteps=[...(o.group1||[])];
+  if(hasGroup2(o))allSteps=[...allSteps,...(o.group2||[])];
+  if(allSteps.length===0)return false;
+  return allSteps.every(s=>(parseInt(s.done)||0)>=q);
+};
+const isOver=o=>!isDone(o)&&o.deadline&&diffDays(o.deadline)<0;
+const isUrgent=o=>!isDone(o)&&o.deadline&&diffDays(o.deadline)>=0&&diffDays(o.deadline)<7;
+const sc=r=>r===0?'#475569':r<1?'#f59e0b':'#10b981';
+const overallRatio=o=>{
+  const q=parseInt(o.qty)||0;
+  let all=[...(o.group1||[])];
+  if(hasGroup2(o))all=[...all,...(o.group2||[])];
+  if(!q||!all.length)return 0;
+  return all.reduce((s,st)=>s+Math.min(parseInt(st.done)||0,q),0)/(q*all.length);
+};
+
+/* 工程の残り時間（時間単位） */
+const stepRemainH=(s,qty)=>{
+  const rem=Math.max(0,qty-(parseInt(s.done)||0));
+  const hpu=parseFloat(s.hoursPerUnit)||0;
+  const mc=Math.max(1,parseInt(s.machineCount)||1);
+  return rem*hpu/mc;
+};
+
+/* 熱処理・外注の待ち時間（時間換算） */
+const waitH=(o,dh)=>{
+  let h=0;
+  if(dh<=0)dh=8;
+  if(o.heatTreat){
+    if(o.heatTreatReturnDate){const d=diffDays(o.heatTreatReturnDate);h+=(d>0?d:0)*dh;}
+    else{h+=3*dh;}
+  }
+  if(o.outsource){
+    if(o.outsourceReturnDate){const d=diffDays(o.outsourceReturnDate);h+=(d>0?d:0)*dh;}
+    else{h+=3*dh;}
+  }
+  return h;
+};
+
+/* 【改修②】計算ロジック
+   楽観値: G1順次合計 + 待ち + G2最後の工程の1個分 (G2があれば)
+   保守値: G1順次合計 + 待ち + G2全工程順次合計 (G2があれば)
+   G2がない場合: G1合計 + 待ち */
+const calcOptimistic=(o,dh)=>{
+  const q=parseInt(o.qty)||0;if(!q)return 0;
+  const g1H=(o.group1||[]).reduce((s,st)=>s+stepRemainH(st,q),0);
+  if(!hasGroup2(o))return g1H+waitH(o,dh);
+  const g2=o.group2||[];
+  const g2Last=g2[g2.length-1];
+  const hpu=parseFloat(g2Last?.hoursPerUnit)||0;
+  const mc=Math.max(1,parseInt(g2Last?.machineCount)||1);
+  const g2LastH=hpu/mc;
+  return g1H+waitH(o,dh)+g2LastH;
+};
+const calcPessimistic=(o,dh)=>{
+  const q=parseInt(o.qty)||0;if(!q)return 0;
+  const g1H=(o.group1||[]).reduce((s,st)=>s+stepRemainH(st,q),0);
+  if(!hasGroup2(o))return g1H+waitH(o,dh);
+  const g2H=(o.group2||[]).reduce((s,st)=>s+stepRemainH(st,q),0);
+  return g1H+waitH(o,dh)+g2H;
+};
+const calcRemaining=o=>{const dh=calcDailyH();return calcPessimistic(o,dh);};
+
+/* 【指摘B】検査・納期のうち近い方を「目標日」として使う
+   戻り値: {targetDate, targetLabel, isInspection} */
+const getTargetDate=o=>{
+  const deadline=o.deadline||null;
+  /* 検査日がある場合：立会/社内のうち早い方 */
+  const inspDates=[];
+  if(o.inspection&&o.inspectionDate)inspDates.push({date:o.inspectionDate,label:'立会検査'});
+  if(o.internalInspection&&o.internalInspectionDate)inspDates.push({date:o.internalInspectionDate,label:'社内検査'});
+  inspDates.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  const earliestInsp=inspDates[0];
+  /* 検査・納期のうち近い方を選ぶ */
+  if(earliestInsp&&deadline){
+    return earliestInsp.date<=deadline
+      ?{targetDate:earliestInsp.date,targetLabel:earliestInsp.label,isInspection:true}
+      :{targetDate:deadline,targetLabel:'納期',isInspection:false};
+  }
+  if(earliestInsp)return{targetDate:earliestInsp.date,targetLabel:earliestInsp.label,isInspection:true};
+  if(deadline)return{targetDate:deadline,targetLabel:'納期',isInspection:false};
+  return{targetDate:null,targetLabel:'',isInspection:false};
+};
+
+/* 【指摘③⑥】納期ラベルは「稼働日（休日除外）ベース」で判定する
+   検査がある場合はそちらを優先 */
+const feasibility=o=>{
+  if(isDone(o))return{cls:'feas-ok',label:'完了',detail:''};
+  const dh=calcDailyH();
+  const tgt=getTargetDate(o);
+  if(!tgt.targetDate)return{cls:'',label:'',detail:''};
+  /* 稼働日残 */
+  const wdays=workingDaysUntil(tgt.targetDate);
+  if(wdays===null)return{cls:'',label:'',detail:''};
+  /* 計算値（詳細情報として表示） */
+  const opt=calcOptimistic(o,dh);
+  const pes=calcPessimistic(o,dh);
+  const optD=(opt/dh).toFixed(1);
+  const pesD=(pes/dh).toFixed(1);
+  const detail=hasGroup2(o)
+    ?`最短${optD}日 〜 最長${pesD}日 / 残${wdays}稼働日（${tgt.targetLabel}まで）`
+    :`必要${pesD}日 / 残${wdays}稼働日（${tgt.targetLabel}まで）`;
+  /* 目標日超過 */
+  if(wdays<0)return{cls:'feas-ng',label:`🚨 ${tgt.targetLabel}超過`,detail};
+  /* 稼働日残り日数ベースの判定 */
+  if(wdays<10)return{cls:'feas-ng',label:`🚨 要注意（${tgt.targetLabel}まで残り${wdays}稼働日）`,detail};
+  if(wdays<20)return{cls:'feas-tight',label:`⚡ 注意（${tgt.targetLabel}まで残り${wdays}稼働日）`,detail};
+  return{cls:'feas-ok',label:'✅ 余裕あり',detail};
+};
+/* calcRisk は表示用に詳細情報を返す */
+const calcRisk=o=>{
+  const dh=calcDailyH();
+  const tgt=getTargetDate(o);
+  if(!tgt.targetDate)return{level:'none',label:'',opt:0,pes:0,daysLeft:null,targetDate:null,targetLabel:'',isInspection:false};
+  const wdays=workingDaysUntil(tgt.targetDate);
+  const opt=calcOptimistic(o,dh);
+  const pes=calcPessimistic(o,dh);
+  const base={opt,pes,daysLeft:wdays,targetDate:tgt.targetDate,targetLabel:tgt.targetLabel,isInspection:tgt.isInspection};
+  if(wdays===null)return{...base,level:'none',label:''};
+  if(wdays<0)return{...base,level:'over',label:`🚨 ${tgt.targetLabel}超過`};
+  if(wdays<10)return{...base,level:'ng',label:`🚨 要注意（残り${wdays}稼働日）`};
+  if(wdays<20)return{...base,level:'warn',label:`⚡ 注意（残り${wdays}稼働日）`};
+  return{...base,level:'ok',label:'✅ 余裕あり'};
+};
+
+/* 【指摘⑥③B】納期ラベル閾値（稼働日ベース、検査優先）
+   検査がある場合は検査日までの稼働日数で判定 */
+const dlStatus=(o_or_date,done)=>{
+  /* 互換：文字列(日付)が渡された場合 */
+  if(typeof o_or_date==='string'){
+    if(!o_or_date)return{cls:'dl-none',label:'納期未設定'};
+    if(done)return{cls:'dl-done',label:'完了'};
+    const wd=workingDaysUntil(o_or_date);
+    if(wd===null)return{cls:'dl-none',label:'納期未設定'};
+    if(wd<0)return{cls:'dl-over',label:`${Math.abs(wd)}日超過`};
+    if(wd<10)return{cls:'dl-urgent',label:`残${wd}日`};
+    if(wd<20)return{cls:'dl-warn',label:`残${wd}日`};
+    return{cls:'dl-ok',label:`残${wd}日`};
+  }
+  /* オブジェクトが渡された場合（新仕様：検査優先） */
+  const o=o_or_date;
+  if(done)return{cls:'dl-done',label:'完了'};
+  const tgt=getTargetDate(o);
+  if(!tgt.targetDate)return{cls:'dl-none',label:'納期未設定'};
+  const wd=workingDaysUntil(tgt.targetDate);
+  if(wd===null)return{cls:'dl-none',label:'納期未設定'};
+  const prefix=tgt.isInspection?'検':'';
+  if(wd<0)return{cls:'dl-over',label:`${prefix}${Math.abs(wd)}日超過`};
+  if(wd<10)return{cls:'dl-urgent',label:`${prefix}残${wd}日`};
+  if(wd<20)return{cls:'dl-warn',label:`${prefix}残${wd}日`};
+  return{cls:'dl-ok',label:`${prefix}残${wd}日`};
+};
+
+/* ===== DAILY NOTES ===== */
+/* 【指摘①】残業時間を担当者別に管理
+   新: overtimeByWorker = { "100": 1.5, "101": 2.0 }
+   旧: overtimeHours (互換性のため読み込み時のみ変換) */
+const _dc={};
+const getDailyNotes=date=>{
+  const d=_dc[date];
+  if(!d)return{meetings:[],overtimeByWorker:{}};
+  /* 旧データ(overtimeHours)がある場合は無視（新規から担当者別にする） */
+  if(!d.overtimeByWorker||typeof d.overtimeByWorker!=='object')d.overtimeByWorker={};
+  return d;
+};
+const saveDailyNotes=(date,data)=>{
+  /* 保存時は新形式のみ（overtimeHoursは削除） */
+  const save={meetings:data.meetings||[],overtimeByWorker:data.overtimeByWorker||{}};
+  _dc[date]=save;
+  apiSet(DK+'_'+date,save);
+};
+
+/* ===== CALENDAR ===== */
+let calEvents=[];
+const saveCalEvents=()=>apiSet(CK,calEvents);
+const eventsOnDate=d=>calEvents.filter(e=>e.date===d);
+const EVENT_TYPES={holiday:{label:'休日',color:'#ef4444',bg:'#450a0a'},event:{label:'行事',color:'#6366f1',bg:'#1e1b4b'},work:{label:'作業',color:'#10b981',bg:'#052e16'},note:{label:'メモ',color:'#94a3b8',bg:'#1e293b'}};
+
+/* ===== ALARM SYSTEM ===== */
+/* アラームは残り7日以内で発動（変更なし） */
+let alarmEnabled=true;
+let alarmTimer=null;
+
+function loadAlarmSetting(){
+  try{const v=localStorage.getItem(ALARM_KEY);alarmEnabled=(v===null)?true:(v==='true');}
+  catch(e){alarmEnabled=true;}
+}
+function saveAlarmSetting(){try{localStorage.setItem(ALARM_KEY,String(alarmEnabled));}catch(e){}}
+function isDismissedToday(){
+  try{const v=localStorage.getItem(ALARM_DISMISS_KEY);return v===todayStr();}
+  catch(e){return false;}
+}
+window.dismissAlarm=()=>{
+  try{localStorage.setItem(ALARM_DISMISS_KEY,todayStr());}catch(e){}
+  const b=document.getElementById('alarm-banner');if(b)b.style.display='none';
+};
+window.toggleAlarmSetting=()=>{
+  alarmEnabled=!alarmEnabled;
+  saveAlarmSetting();
+  if(!alarmEnabled){
+    const b=document.getElementById('alarm-banner');if(b)b.style.display='none';
+    if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null;}
+  }else{startAlarmTimer();checkAlarm();}
+  render();
+};
+
+function playAlarmSound(strong){
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx)return;
+    const ctx=new Ctx();
+    const count=strong?3:2;
+    for(let i=0;i<count;i++){
+      const o=ctx.createOscillator();const g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.frequency.value=strong?880:660;o.type='sine';
+      g.gain.setValueAtTime(0,ctx.currentTime+i*0.4);
+      g.gain.linearRampToValueAtTime(0.4,ctx.currentTime+i*0.4+0.05);
+      g.gain.linearRampToValueAtTime(0,ctx.currentTime+i*0.4+0.3);
+      o.start(ctx.currentTime+i*0.4);o.stop(ctx.currentTime+i*0.4+0.3);
+    }
+  }catch(e){/* 音声エラーは無視 */}
+}
+
+function checkAlarm(){
+  try{
+    if(!alarmEnabled||isDismissedToday())return;
+    const overOrders=orders.filter(o=>!isDone(o)&&o.deadline&&diffDays(o.deadline)<0);
+    const urgentOrders=orders.filter(o=>!isDone(o)&&o.deadline&&diffDays(o.deadline)>=0&&diffDays(o.deadline)<7);
+    const banner=document.getElementById('alarm-banner');
+    const msg=document.getElementById('alarm-msg');
+    if(!banner||!msg)return;
+    if(overOrders.length>0){
+      banner.className='over';msg.textContent=`🚨 納期超過 ${overOrders.length}件あります！`;
+      banner.style.display='block';playAlarmSound(true);
+    }else if(urgentOrders.length>0){
+      banner.className='urgent';msg.textContent=`⚡ 納期7日以内 ${urgentOrders.length}件あります`;
+      banner.style.display='block';playAlarmSound(false);
+    }else{banner.style.display='none';}
+  }catch(e){console.error('checkAlarm error:',e);}
+}
+
+function startAlarmTimer(){
+  if(alarmTimer)clearInterval(alarmTimer);
+  alarmTimer=setInterval(checkAlarm,5*60*1000);
+}
+
+/* ===== STATE ===== */
+let S={
+  locked:true,pw:'',pwErr:false,
+  view:'list',eid:null,
+  form:blankOrder(),
+  groupBy:'all',showDone:false,showCautionOnly:false,q:'',
+  teamFilter:'全班',
+  dailyDate:todayStr(),dailyTeam:'全班',
+  calYear:new Date().getFullYear(),calMonth:new Date().getMonth(),
+  calSelDate:todayStr(),calModal:false,calEditId:null,
+  calForm:{title:'',type:'event'},
+  masterTab:'workers',
+  wModal:false,wForm:null,
+};
+const set=patch=>{
+  try{
+    const oldDate=S.dailyDate;
+    Object.assign(S,patch);
+    if(patch.dailyDate&&patch.dailyDate!==oldDate){
+      if(_dc[patch.dailyDate])return render();
+      apiGet(DK+'_'+patch.dailyDate).then(d=>{_dc[patch.dailyDate]=d||{meetings:[],overtimeByWorker:{}};render();});
+      return;
+    }
+    render();
+  }catch(e){console.error('set error:',e);}
+};
+window.set=set;
+
+/* ===== GLOBAL WINDOW FUNCTIONS ===== */
+window.addStepToGroup=gk=>{
+  const steps=[...(S.form[gk]||[])];
+  const n=steps.length+1;
+  const prefix=gk==='group1'?'加工１-':'加工２-';
+  steps.push(defStep(gk==='group1'&&n===1?'加工１':gk==='group2'&&n===1?'加工２':`${prefix}${n}`));
+  S.form={...S.form,[gk]:steps};render();
+};
+window.removeStepFromGroup=(gk,i)=>{
+  const steps=[...(S.form[gk]||[])];
+  if(steps.length<=1)return;
+  steps.splice(i,1);
+  S.form={...S.form,[gk]:steps};render();
+};
+window.addMachine=()=>{
+  const ne=document.getElementById('nm-n'),te=document.getElementById('nm-t');
+  const n=ne?ne.value.trim():'';const t=te?te.value.trim():'';
+  if(!n)return;
+  masters.machines=[...masters.machines,{id:uid(),name:n,type:t||''}];
+  saveMasters();render();
+};
+window.delMachine=id=>{if(!confirm('削除しますか？'))return;masters.machines=masters.machines.filter(m=>m.id!=id);saveMasters();render();};
+window.addBreak=()=>{masters.workSettings.breaks=[...(masters.workSettings.breaks||[]),{id:uid(),start:'12:00',end:'13:00'}];saveMasters();render();};
+window.delBreak=id=>{masters.workSettings.breaks=(masters.workSettings.breaks||[]).filter(b=>b.id!=id);saveMasters();render();};
+window.saveWS=()=>{
+  try{
+    const ws=masters.workSettings;
+    const sEl=document.getElementById('ws-s');const eEl=document.getElementById('ws-e');
+    ws.startTime=sEl?sEl.value:'08:00';
+    ws.endTime=eEl?eEl.value:'17:00';
+    /* 【改修⑤】overtimeは保存しない */
+    (ws.breaks||[]).forEach(b=>{
+      const bs=document.getElementById(`br-s-${b.id}`);const be=document.getElementById(`br-e-${b.id}`);
+      if(bs)b.start=bs.value;if(be)b.end=be.value;
+    });
+    saveMasters();alert('✅ 保存しました');render();
+  }catch(e){alert('保存エラー: '+e.message);}
+};
+window.openWorkerEdit=id=>{
+  const w=id?masters.workers.find(x=>x.id==id)||null:null;
+  S.wForm=w?{...w,skills:[...(w.skills||[])]}:{id:uid(),name:'',team:'',role:'作業員',mainMachineId:'',skills:[]};
+  S.wModal=true;render();
+};
+window.closeWorkerModal=()=>{S.wModal=false;S.wForm=null;render();};
+window.saveWorker=()=>{
+  const f=S.wForm;if(!f||!f.name){alert('名前を入力してください');return;}
+  const ex=masters.workers.find(w=>w.id==f.id);
+  if(ex)masters.workers=masters.workers.map(w=>w.id==f.id?f:w);
+  else masters.workers=[...masters.workers,f];
+  saveMasters();S.wModal=false;S.wForm=null;render();
+};
+window.delWorker=id=>{if(!confirm('削除しますか？'))return;masters.workers=masters.workers.filter(w=>w.id!=id);saveMasters();S.wModal=false;S.wForm=null;render();};
+window.addWorkerSkill=()=>{if(!S.wForm)return;S.wForm={...S.wForm,skills:[...(S.wForm.skills||[]),{id:uid(),machineId:'',level:3}]};render();};
+window.removeWorkerSkill=idx=>{const sk=[...(S.wForm.skills||[])];sk.splice(idx,1);S.wForm={...S.wForm,skills:sk};render();};
+
+/* 【指摘①】担当者別の残業時間を更新 */
+window.updateDailyOvertime=(workerId,v)=>{
+  const val=parseFloat(v);
+  const d=getDailyNotes(S.dailyDate);
+  if(!d.overtimeByWorker)d.overtimeByWorker={};
+  if(isNaN(val)||val<=0){
+    /* 0または空欄なら削除（ゴミデータを残さない） */
+    delete d.overtimeByWorker[workerId];
+  }else{
+    d.overtimeByWorker[workerId]=val;
+  }
+  saveDailyNotes(S.dailyDate,d);
+};
+
+window.addMeeting=session=>{
+  const d=getDailyNotes(S.dailyDate);
+  d.meetings=[...(d.meetings||[]),{id:uid(),session,text:'',checked:false}];
+  saveDailyNotes(S.dailyDate,d);render();
+};
+window.delMeeting=id=>{
+  const d=getDailyNotes(S.dailyDate);d.meetings=(d.meetings||[]).filter(m=>m.id!=id);saveDailyNotes(S.dailyDate,d);render();
+};
+window.toggleMeeting=id=>{
+  const d=getDailyNotes(S.dailyDate);d.meetings=(d.meetings||[]).map(m=>m.id==id?{...m,checked:!m.checked}:m);saveDailyNotes(S.dailyDate,d);render();
+};
+window.calPrev=()=>{let m=S.calMonth-1,y=S.calYear;if(m<0){m=11;y--;}set({calMonth:m,calYear:y});};
+window.calNext=()=>{let m=S.calMonth+1,y=S.calYear;if(m>11){m=0;y++;}set({calMonth:m,calYear:y});};
+window.calSelectDay=d=>{set({calSelDate:d,calModal:false,calEditId:null,calForm:{title:'',type:'event'}});};
+window.calOpenAdd=()=>{set({calModal:true,calEditId:null,calForm:{title:'',type:'event'}});};
+window.calEdit=id=>{const e=calEvents.find(x=>x.id==id);if(!e)return;set({calModal:true,calEditId:id,calForm:{title:e.title,type:e.type}});};
+window.calSave=()=>{
+  const f=S.calForm;if(!f.title){alert('タイトルを入力してください');return;}
+  if(S.calEditId){calEvents=calEvents.map(e=>e.id==S.calEditId?{...e,title:f.title,type:f.type,color:EVENT_TYPES[f.type]?.color||'#6366f1'}:e);}
+  else calEvents=[...calEvents,{id:uid(),date:S.calSelDate,title:f.title,type:f.type,color:EVENT_TYPES[f.type]?.color||'#6366f1'}];
+  saveCalEvents();set({calModal:false,calEditId:null});
+};
+window.calDel=id=>{if(!confirm('削除しますか？'))return;calEvents=calEvents.filter(e=>e.id!=id);saveCalEvents();render();};
+
+/* 【指摘A】選択日の休日設定/解除をワンクリックで切り替え */
+window.toggleHoliday=date=>{
+  const existing=calEvents.find(e=>e.date===date&&e.type==='holiday');
+  if(existing){
+    calEvents=calEvents.filter(e=>e.id!==existing.id);
+  }else{
+    calEvents=[...calEvents,{id:uid(),date,title:'休日',type:'holiday',color:'#ef4444'}];
+  }
+  saveCalEvents();render();
+};
+
+/* 【改修④】置き場在庫を削除する関数（編集画面/詳細画面両方で使用） */
+window.delStorage=(orderId,place)=>{
+  if(!confirm(`「${place}」の置き場在庫を削除しますか？`))return;
+  if(orderId===null){
+    /* 編集画面での削除 */
+    const sq={...(S.form.storageQty||{})};
+    delete sq[place];
+    S.form={...S.form,storageQty:sq};
+  }else{
+    /* 詳細画面からの削除 */
+    orders=orders.map(o=>{
+      if(o.id!==orderId)return o;
+      const sq={...(o.storageQty||{})};
+      delete sq[place];
+      return{...o,storageQty:sq};
+    });
+    persist();
+  }
+  render();
+};
+
+/* ===== ORDER CRUD ===== */
+function saveOrder(){
+  try{
+    const qty=parseInt(S.form.qty,10)||0;
+    const deadline=getDateVal('f-dl')||S.form.deadline||'';
+    const inspectionDate=getDateVal('f-ins')||S.form.inspectionDate||'';
+    const internalInspectionDate=getDateVal('f-iins')||S.form.internalInspectionDate||'';
+    const heatTreatReturnDate=getDateVal('f-ht')||S.form.heatTreatReturnDate||'';
+    const outsourceReturnDate=getDateVal('f-os')||S.form.outsourceReturnDate||'';
+    /* 【改修④】置き場在庫：存在するキーのみ保存 */
+    const storageQty={};
+    document.querySelectorAll('.storage-inp').forEach(el=>{
+      const place=el.dataset.place;
+      const v=parseInt(el.value)||0;
+      if(place&&v>0)storageQty[place]=v;
+    });
+    const e={
+      ...S.form,qty,deadline,inspectionDate,internalInspectionDate,
+      heatTreatReturnDate,outsourceReturnDate,
+      storageQty,
+      group1:(S.form.group1||[]).map(s=>({...s,done:Math.min(parseInt(s.done)||0,qty)})),
+      group2:(S.form.group2||[]).map(s=>({...s,done:Math.min(parseInt(s.done)||0,qty)})),
+    };
+    orders=S.eid?orders.map(o=>o.id===S.eid?e:o):[...orders,e];
+    persist();checkAlarm();set({view:'list'});
+  }catch(e){alert('保存エラー: '+e.message);}
+}
+function delOrder(id){if(!confirm('削除しますか？'))return;orders=orders.filter(o=>o.id!==id);persist();checkAlarm();set({view:'list'});}
+function updStepDone(oid,gk,sid,val){
+  try{
+    orders=orders.map(o=>{
+      if(o.id!==oid)return o;
+      const q=parseInt(o.qty)||0;
+      const newG=(o[gk]||[]).map(s=>s.id!=sid?s:{...s,done:Math.max(0,Math.min(parseInt(val)||0,q))});
+      return{...o,[gk]:newG};
+    });
+    persist();render();
+  }catch(e){console.error('updStepDone error:',e);}
+}
+function updStepActual(oid,gk,sid,val){
+  try{
+    orders=orders.map(o=>{
+      if(o.id!==oid)return o;
+      const newG=(o[gk]||[]).map(s=>s.id!=sid?s:{...s,actualHours:val});
+      return{...o,[gk]:newG};
+    });
+    persist();render();
+  }catch(e){console.error('updStepActual error:',e);}
+}
+function goNew(){set({view:'form',eid:null,form:blankOrder()});}
+function goEdit(o){
+  if(!o)return;
+  set({view:'form',eid:o.id,form:{...o,group1:(o.group1||[]).map(s=>({...s})),group2:(o.group2||[]).map(s=>({...s}))}});
+}
+
+/* ===== RENDER ===== */
+function render(){
+  try{document.getElementById('app').innerHTML=buildHTML();bindEvents();}
+  catch(e){console.error('render error:',e);document.getElementById('app').innerHTML='<div style="padding:40px;text-align:center;color:#ef4444">エラーが発生しました。ページを再読み込みしてください。</div>';}
+}
+function buildHTML(){
+  if(S.locked)return buildLock();
+  const views={list:buildList,form:buildForm,detail:buildDetail,masters:buildMasters,daily:buildDaily,calendar:buildCalendar};
+  return (views[S.view]||buildList)()+buildBottomNav();
+}
+function buildBottomNav(){
+  if(S.locked||S.view==='form')return'';
+  const alarmIcon=alarmEnabled?'🔔':'🔕';
+  const tabs=[['list','📋','一覧'],['daily','👷','日報'],['calendar','🗓','カレンダー'],['masters','⚙️','設定']];
+  return`<nav class="bnav">
+    ${tabs.map(([v,ic,lb])=>`<button onclick="set({view:'${v}'})" class="${S.view===v?'active':''}"><span class="ico">${ic}</span>${lb}</button>`).join('')}
+    <button onclick="toggleAlarmSetting()" title="アラーム設定"><span class="ico">${alarmIcon}</span>アラーム</button>
+  </nav>`;
+}
+
+/* ===== LOCK ===== */
+function buildLock(){
+  return`<div style="min-height:100vh;background:linear-gradient(135deg,#0d1117,#1e1b4b,#0d1117);display:flex;align-items:center;justify-content:center">
+  <div style="background:rgba(22,27,34,.97);border:1px solid #30363d;border-radius:20px;padding:30px 34px 36px;width:300px;animation:glow 3s ease infinite;text-align:center">
+    <div style="font-size:48px;margin-bottom:12px">⚙️</div>
+    <h2 style="color:#e2e8f0;margin:0 0 2px;font-size:19px;font-weight:900">工程管理システム</h2>
+    <p style="color:#6366f1;font-size:10px;letter-spacing:3px;margin-bottom:24px">造機工場 / 工程管理</p>
+    <input id="pw-inp" type="password" placeholder="パスワード" value="${esc(S.pw)}" style="text-align:center;font-size:20px;letter-spacing:12px;margin-bottom:10px;border-color:${S.pwErr?'#ef4444':'#4338ca'}">
+    ${S.pwErr?`<p style="color:#ef4444;font-size:12px;margin-bottom:8px">❌ パスワードが違います</p>`:''}
+    <button id="login-btn" class="btn-p" style="width:100%">ログイン →</button>
+    <p style="color:#334155;font-size:11px;margin-top:14px">初期PW: 1234</p>
+  </div></div>`;
+}
+
+/* ===== LIST ===== */
+function buildList(){
+  const doneN=orders.filter(isDone).length;
+  const remainN=orders.length-doneN;
+  const overN=orders.filter(isOver).length;
+  const urgentN=orders.filter(isUrgent).length;
+  const cautionN=orders.filter(o=>o.caution&&!isDone(o)).length;
+  const inspItems=orders.filter(o=>(o.inspection||o.internalInspection)&&!isDone(o)).sort((a,b)=>(a.inspectionDate||a.internalInspectionDate||'').localeCompare(b.inspectionDate||b.internalInspectionDate||''));
+  const getOrderTeams=o=>{
+    const all=[...(o.group1||[]),...(o.group2||[])];
+    const teams=new Set();
+    all.forEach(s=>{const w=workerById(s.operatorId);if(w&&w.team)teams.add(w.team);});
+    return teams;
+  };
+  const visible=orders.filter(o=>{
+    if(!S.showDone&&isDone(o))return false;
+    if(S.showCautionOnly&&!o.caution)return false;
+    const tf=S.teamFilter||'全班';
+    if(tf!=='全班'){const teams=getOrderTeams(o);if(!teams.has(tf))return false;}
+    if(S.q){
+      const all=[...(o.group1||[]),...(o.group2||[])];
+      return[o.seiban,o.client,o.product,...all.map(s=>machineName(s.machineId)),o.note].some(v=>(v||'').includes(S.q));
+    }
+    return true;
+  });
+  const minibar=(r,c)=>`<div style="height:5px;background:#0d1117;border-radius:99px;overflow:hidden;min-width:34px"><div style="height:100%;width:${Math.min(r*100,100)}%;background:${c};border-radius:99px"></div></div>`;
+  const accentColors=['#6366f1','#06b6d4','#10b981','#f59e0b','#f97316','#ef4444'];
+  const grouped=(()=>{
+    const map={};
+    visible.forEach(o=>{
+      const key=S.groupBy==='machine'
+        ?([...(o.group1||[]),...(o.group2||[])].map(s=>machineName(s.machineId)).filter(Boolean).join('・')||'機械未設定')
+        :(o.deadline?`${o.deadline.slice(0,4)}年${parseInt(o.deadline.slice(5,7))}月`:'納期未設定');
+      if(!map[key])map[key]=[];map[key].push(o);
+    });
+    return Object.keys(map).sort((a,b)=>{if(a==='納期未設定'||a==='機械未設定')return 1;if(b==='納期未設定'||b==='機械未設定')return-1;return a.localeCompare(b);}).map(k=>({key:k,items:map[k].sort((a,b)=>(a.deadline||'9999').localeCompare(b.deadline||'9999'))}));
+  })();
+
+  /* 【改修⑥】目標超過のラベルを14日-30日に変更 */
+  const nearCount=orders.filter(o=>!isDone(o)&&o.deadline&&diffDays(o.deadline)<30&&diffDays(o.deadline)>=14).length;
+
+  return`
+  <div class="hdr">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="spin" style="font-size:20px">⚙️</span>
+      <div>
+        <div style="font-weight:900;color:#e2e8f0;font-size:14px">工程管理システム</div>
+        <div style="color:#6366f1;font-size:9px;letter-spacing:2px">造機工場</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px">
+      <button id="new-btn" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;border-radius:7px;color:#fff;padding:7px 14px;font-weight:700;font-size:13px">＋ 新規</button>
+      <button id="lock-btn" style="background:none;font-size:18px;padding:4px">🔒</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px">
+      ${[
+        ['📋','残件数',remainN,'#e2e8f0','#161b22','#21262d'],
+        ['🚨','超過',overN,'#ef4444',overN>0?'#2d0a0a':'#161b22',overN>0?'#ef444450':'#21262d'],
+        ['⚡','7日以内',urgentN,'#f97316',urgentN>0?'#1c0a00':'#161b22',urgentN>0?'#f9731650':'#21262d'],
+        ['⚑','注意',nearCount,'#eab308','#161b22','#21262d'],
+        ['✅','完了',doneN,'#10b981','#161b22','#21262d']
+      ].map(([ic,lb,vl,co,bg,bd])=>`
+      <div style="background:${bg};border:1px solid ${bd};border-radius:10px;padding:8px 4px;text-align:center">
+        <div style="font-size:15px">${ic}</div><div style="color:${co};font-weight:900;font-size:20px;line-height:1.1">${vl}</div>
+        <div style="color:#475569;font-size:10px;margin-top:1px">${lb}</div>
+      </div>`).join('')}
+    </div>
+    ${inspItems.length>0?`<div class="card" style="border-color:#10b98150;background:linear-gradient(135deg,#052e1690,#161b22);margin-bottom:10px">
+      <p style="color:#10b981;font-weight:700;font-size:11px;letter-spacing:1px;margin-bottom:7px">🔍 検査スケジュール</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${inspItems.map(o=>`<div onclick="set({view:'detail',eid:${o.id}})" style="background:#0d1117;border:1px solid #10b98140;border-radius:7px;padding:5px 9px;cursor:pointer"><div style="color:#10b981;font-weight:700;font-size:11px">${fmtFull(o.inspectionDate||o.internalInspectionDate)}</div><div style="color:#e2e8f0;font-size:10px">${esc(o.product)||'―'}</div></div>`).join('')}
+      </div>
+    </div>`:''}
+    <div class="team-tab-row">
+      ${['全班','1班','2班','3班'].map(t=>`<button onclick="set({teamFilter:'${t}'})" class="${(S.teamFilter||'全班')===t?'active':''}">${t}</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <div style="display:flex;background:#161b22;border:1px solid #21262d;border-radius:8px;overflow:hidden">
+        ${[['all','📋 全て'],['month','📅 月別'],['machine','🔧 機械別']].map(([k,l])=>`<button class="tab-btn" data-group="${k}" style="background:${S.groupBy===k?'linear-gradient(135deg,#4f46e5,#7c3aed)':'transparent'};border:none;color:${S.groupBy===k?'#fff':'#64748b'};padding:6px 10px;font-weight:700;font-size:11px">${l}</button>`).join('')}
+      </div>
+      <button id="toggle-done" style="background:${S.showDone?'#052e16':'#161b22'};border:1px solid ${S.showDone?'#10b98150':'#21262d'};border-radius:8px;color:${S.showDone?'#10b981':'#64748b'};padding:6px 9px;font-weight:700;font-size:11px">${S.showDone?'✅完了含む':'完了を隠す'}</button>
+      ${cautionN>0?`<button id="toggle-caution" style="background:${S.showCautionOnly?'#450a0a':'#161b22'};border:1px solid ${S.showCautionOnly?'#ef444460':'#21262d'};border-radius:8px;color:${S.showCautionOnly?'#ef4444':'#64748b'};padding:6px 9px;font-weight:700;font-size:11px">⚠️ 注意${S.showCautionOnly?'':('('+cautionN+')')}</button>`:''}
+      <div style="position:relative;flex:1;min-width:110px">
+        <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:13px">🔍</span>
+        <input id="search-inp" value="${esc(S.q)}" placeholder="検索..." style="padding-left:30px;background:#161b22;border-color:#21262d;font-size:12px">
+      </div>
+    </div>
+    ${grouped.length===0?`<div style="text-align:center;padding:50px 20px"><div style="font-size:50px;margin-bottom:10px">🏭</div><p style="color:#475569;font-size:15px;margin-bottom:16px">工程がまだ登録されていません</p><button id="new-btn2" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;border-radius:10px;color:#fff;padding:11px 28px;font-weight:700;font-size:14px">＋ 最初の工程を登録</button></div>`:''}
+    ${grouped.map(({key,items},gi)=>{
+      const gDone=items.filter(isDone).length;
+      const gOver=items.filter(isOver).length;
+      const ac=accentColors[gi%accentColors.length];
+      return`<div style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:0 2px">
+          <div style="width:3px;height:18px;background:${ac};border-radius:2px"></div>
+          <span style="color:${ac};font-weight:900;font-size:13px">${esc(key)}</span>
+          <div style="height:1px;flex:1;background:#21262d"></div>
+          <span style="color:#475569;font-size:11px">残${items.length-gDone}</span>
+          ${gOver>0?`<span style="color:#ef4444;font-size:11px;font-weight:700">超過${gOver}</span>`:''}
+        </div>
+        <div style="background:#161b22;border:1px solid ${ac}33;border-radius:10px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:72px 1fr 50px 80px 1fr;padding:5px 10px;background:#0a0f18;border-bottom:1px solid ${ac}22">
+            ${['整番','製品名','個数','納期','進捗'].map(h=>`<div style="color:#475569;font-size:10px;font-weight:700;letter-spacing:1px">${h}</div>`).join('')}
+          </div>
+          ${items.map((o,i)=>{
+            const done=isDone(o);const ov=overallRatio(o);
+            const ds=dlStatus(o,done);const qty=parseInt(o.qty)||0;
+            const feas=feasibility(o);
+            return`<div class="order-row" data-id="${o.id}" style="display:grid;grid-template-columns:72px 1fr 50px 80px 1fr;padding:7px 10px;border-bottom:${i<items.length-1?'1px solid #21262d12':'none'};cursor:pointer;background:${done?'#0a110a':o.caution?'#160a0a':'transparent'};opacity:${done?.5:1};align-items:center">
+              <div>
+                <div style="color:#6366f1;font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.seiban)||'―'}</div>
+                <div style="display:flex;gap:2px;flex-wrap:wrap;margin-top:2px">
+                  ${o.caution?`<span class="pulse" style="background:#450a0a;color:#ef4444;border-radius:3px;padding:0 3px;font-size:9px">⚠️</span>`:''}
+                  ${o.internalInspection?`<span style="background:#052e16;color:#22d3ee;border-radius:3px;padding:0 3px;font-size:9px">🏭</span>`:''}
+                  ${o.inspection?`<span style="background:#052e16;color:#10b981;border-radius:3px;padding:0 3px;font-size:9px">🔍</span>`:''}
+                  ${o.heatTreat?`<span style="background:#1c0a00;color:#f97316;border-radius:3px;padding:0 3px;font-size:9px">🔥</span>`:''}
+                  ${o.outsource?`<span style="background:#1e0a3c;color:#8b5cf6;border-radius:3px;padding:0 3px;font-size:9px">🚚</span>`:''}
+                </div>
+              </div>
+              <div style="padding:0 4px;min-width:0">
+                <div style="color:#e2e8f0;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.product)||'―'}</div>
+                <div style="color:#64748b;font-size:11px">${esc(o.client)||''}</div>
+                ${feas.label&&!done?`<div style="font-size:11px;font-weight:700;margin-top:2px" class="${feas.cls}">${feas.label}</div>`:''}
+                ${feas.detail&&!done?`<div style="font-size:10px;color:#475569;margin-top:1px">${feas.detail}</div>`:''}
+                ${(()=>{const stot=Object.values(o.storageQty||{}).reduce((a,b)=>a+(parseInt(b)||0),0);return stot>0?`<div style="font-size:10px;color:#f59e0b;margin-top:2px">📦 置き場 ${stot}個</div>`:'';})()}
+              </div>
+              <div style="text-align:center;color:#94a3b8;font-size:12px;font-weight:700">${qty}<span style="font-size:10px;color:#475569">個</span></div>
+              <div>
+                <div class="tag ${ds.cls}" style="text-align:center;display:inline-block">${done?'完了':o.deadline?fmt(o.deadline):'未設定'}</div>
+              </div>
+              <div style="padding-left:4px">
+                <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+                  <div style="flex:1">${minibar(ov,sc(ov))}</div>
+                  <span style="color:${sc(ov)};font-size:9px;font-weight:700">${Math.round(ov*100)}%</span>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+/* ===== FORM (編集画面) ===== */
+/* 【改修⑦】オプションの順序：社内検査→立会検査  */
+/* 【改修④】置き場在庫に×ボタン */
+function buildForm(){
+  const f=S.form;
+  const machineOpts=`<option value="">機械未設定</option>${(masters.machines||[]).map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}`;
+  const workerOpts=`<option value="">担当未設定</option>${(masters.workers||[]).map(w=>`<option value="${w.id}">${esc(w.name)} (${esc(w.role)}${w.team?' '+esc(w.team):''})</option>`).join('')}`;
+  const tog=(key,val,label,color='#6366f1')=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#0d1117;border-radius:8px;border:1px solid #21262d;margin-bottom:6px">
+    <span style="color:#94a3b8;font-size:12px">${label}</span>
+    <button class="tog" data-toggle="${key}" data-val="${val}" style="background:${val?`linear-gradient(135deg,${color},${color}bb)`:'#1e293b'};border:1px solid ${val?color:'#334155'};color:${val?'#fff':'#475569'}">${val?'ON':'OFF'}</button>
+  </div>`;
+
+  const renderGroupSteps=(gk,color,label)=>{
+    const steps=f[gk]||[];
+    return`<div class="group-box ${gk}-box">
+      <div class="group-label" style="color:${color}">
+        <div style="width:4px;height:16px;background:${color};border-radius:2px"></div>
+        ${label}
+      </div>
+      ${steps.map((s,i)=>{
+        const selMachine=machineOpts.replace(`value="${esc(s.machineId)}"`,`value="${esc(s.machineId)}" selected`);
+        const selWorker=workerOpts.replace(`value="${esc(s.operatorId)}"`,`value="${esc(s.operatorId)}" selected`);
+        return`<div class="step-c">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+            <div style="background:${color};color:#fff;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:900">${i+1}</div>
+            <input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="name" value="${esc(s.name||'')}" placeholder="工程名" style="flex:1;font-weight:700;border-color:#21262d">
+            ${steps.length>1?`<button class="btn-xs" onclick="removeStepFromGroup('${gk}',${i})" style="color:#f87171;border-color:#ef444440">✕</button>`:''}
+          </div>
+          <div class="g2" style="gap:8px;margin-bottom:8px">
+            <div><label class="lbl">担当機械</label><select class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="machineId">${selMachine}</select></div>
+            <div><label class="lbl">担当者</label><select class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="operatorId">${selWorker}</select></div>
+          </div>
+          <div class="g3" style="gap:8px">
+            <div><label class="lbl">同時台数</label><input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="machineCount" type="number" min="1" value="${s.machineCount||1}" style="text-align:center"></div>
+            <div><label class="lbl">時間/個(h)</label><input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="hoursPerUnit" type="number" min="0" step="0.1" value="${s.hoursPerUnit||''}" placeholder="2.5"></div>
+            <div><label class="lbl">実績合計(h)</label><input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="actualHours" type="number" min="0" step="0.5" value="${s.actualHours||''}" placeholder="12.5"></div>
+          </div>
+        </div>`;
+      }).join('')}
+      <button onclick="addStepToGroup('${gk}')" style="background:#1e293b;border:1px solid ${color}44;border-radius:7px;color:${color};padding:8px;font-size:12px;font-weight:700;width:100%;margin-top:4px">＋ ${label}に工程を追加</button>
+    </div>`;
+  };
+
+  /* 【指摘⑤】置き場在庫: 全STORAGE_PLACESを常に表示、×で0クリア */
+  const storageQty=f.storageQty||{};
+
+  return`<div class="up">
+  <div class="hdr">
+    <button id="back-btn" style="background:none;color:#94a3b8;font-size:13px;padding:4px 8px">← 戻る</button>
+    <span style="font-weight:800;color:#e2e8f0">${S.eid?'✏️ 工程を編集':'➕ 新規登録'}</span>
+    <button id="lock-btn" style="background:none;font-size:18px;padding:4px">🔒</button>
+  </div>
+  <div class="wrap" style="max-width:700px">
+    <div class="card">
+      <p class="lbl" style="margin-bottom:12px">📋 基本情報</p>
+      <div class="g2">
+        ${[['整番','seiban','A-0001'],['客先名','client','株式会社〇〇'],['製品名','product','品番'],['材質','material','SUS304']].map(([l,k,ph])=>`<div><label class="lbl">${l}</label><input class="f-inp" data-key="${k}" value="${esc(f[k]||'')}" placeholder="${ph}"></div>`).join('')}
+        <div><label class="lbl">受注個数</label><input class="f-inp" data-key="qty" type="number" min="1" value="${f.qty||''}" placeholder="6"></div>
+        <div><label class="lbl">納期</label>${makeDateSelects('f-dl',f.deadline,'deadline')}</div>
+      </div>
+      <div style="margin-top:10px"><label class="lbl">備考</label><textarea class="f-inp" data-key="note" style="height:50px;resize:vertical">${esc(f.note||'')}</textarea></div>
+    </div>
+
+    ${renderGroupSteps('group1','#6366f1','工程グループ１')}
+
+    <div class="opt-divider">
+      <p style="color:#475569;font-size:10px;font-weight:700;letter-spacing:1px;margin-bottom:8px">▼ グループ間オプション</p>
+      ${tog('heatTreat',f.heatTreat,'🔥 熱処理','#f97316')}
+      ${f.heatTreat?`<div style="margin:-2px 0 6px;padding:8px 12px;background:#0d1117;border-radius:7px;border:1px solid #21262d">
+        <label class="lbl">熱処理 戻り日（未選択の場合 +3日で自動計算）</label>
+        ${makeDateSelects('f-ht',f.heatTreatReturnDate,'heatTreatReturnDate')}
+        <p style="color:#475569;font-size:11px;margin-top:4px">※空欄のまま → 工程１完了日から3日後を自動適用</p>
+      </div>`:''}
+      ${tog('outsource',f.outsource,'🚚 外注','#8b5cf6')}
+      ${f.outsource?`<div style="margin:-2px 0 6px;padding:8px 12px;background:#0d1117;border-radius:7px;border:1px solid #21262d">
+        <label class="lbl">外注 戻り日（未選択の場合 +3日で自動計算）</label>
+        ${makeDateSelects('f-os',f.outsourceReturnDate,'outsourceReturnDate')}
+        <p style="color:#475569;font-size:11px;margin-top:4px">※空欄のまま → 工程１完了日から3日後を自動適用</p>
+      </div>`:''}
+    </div>
+
+    ${renderGroupSteps('group2','#06b6d4','工程グループ２')}
+
+    <div class="opt-divider">
+      <p style="color:#475569;font-size:10px;font-weight:700;letter-spacing:1px;margin-bottom:8px">▼ グループ２後オプション</p>
+      ${tog('internalInspection',f.internalInspection,'🏭 社内検査','#22d3ee')}
+      ${f.internalInspection?`<div style="margin:-2px 0 6px;padding:8px 12px;background:#0d1117;border-radius:7px;border:1px solid #21262d">
+        <label class="lbl">社内検査日</label>${makeDateSelects('f-iins',f.internalInspectionDate,'internalInspectionDate')}</div>`:''}
+      ${tog('inspection',f.inspection,'🔍 立会検査','#10b981')}
+      ${f.inspection?`<div style="margin:-2px 0 6px;padding:8px 12px;background:#0d1117;border-radius:7px;border:1px solid #21262d">
+        <label class="lbl">立会検査日</label>${makeDateSelects('f-ins',f.inspectionDate,'inspectionDate')}</div>`:''}
+    </div>
+
+    <div class="card">
+      <p class="lbl" style="margin-bottom:10px">🔧 その他オプション</p>
+      ${tog('caution',f.caution,'⚠️ 注意が必要な製品','#ef4444')}
+      ${f.caution?`<div style="margin-top:6px"><label class="lbl">注意内容</label><textarea class="f-inp" data-key="cautionNote" style="height:50px;resize:vertical">${esc(f.cautionNote||'')}</textarea></div>`:''}
+    </div>
+
+    <div class="card">
+      <p class="lbl" style="margin-bottom:12px;font-size:13px">📦 置き場在庫（加工場に入る前の個数）</p>
+      ${STORAGE_PLACES.map(pl=>{
+        const v=parseInt(storageQty[pl])||0;
+        return`<div class="storage-row">
+          <label>${esc(pl)}</label>
+          <input class="storage-inp" data-place="${esc(pl)}" type="number" min="0" value="${v||''}">
+          <button type="button" class="storage-del-form" data-place="${esc(pl)}" title="値を0にクリア">✕</button>
+        </div>`;
+      }).join('')}
+      <div style="margin-top:10px;padding:8px 12px;background:#0d1117;border-radius:8px;font-size:13px;color:#94a3b8">
+        合計: <strong style="color:#e2e8f0;font-size:16px">${Object.values(storageQty).reduce((a,b)=>a+(parseInt(b)||0),0)}</strong> 個
+      </div>
+      <p style="color:#64748b;font-size:11px;margin-top:6px">※ ×ボタンで値を0にクリアできます（0の場合は保存されません）</p>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button id="submit-btn" class="btn-p" style="flex:1">${S.eid?'✅ 更新する':'➕ 登録する'}</button>
+      ${S.eid?`<button id="del-btn" class="btn-d">🗑</button>`:''}
+    </div>
+  </div></div>`;
+}
+
+/* ===== DETAIL (詳細画面) ===== */
+function buildDetail(){
+  const o=orders.find(x=>x.id===S.eid);if(!o){S.view='list';return buildList();}
+  const done=isDone(o);const ds=dlStatus(o,done);
+  const qty=parseInt(o.qty)||0;
+  const dh=calcDailyH();
+  const totalH=calcRemaining(o);
+  const feas=feasibility(o);
+  const g2Exists=hasGroup2(o);
+  const bar=(r,c,h=8)=>`<div style="height:${h}px;background:#0d1117;border-radius:99px;overflow:hidden"><div style="height:100%;width:${Math.min(r*100,100)}%;background:linear-gradient(90deg,${c},${c}bb);border-radius:99px;transition:width .4s"></div></div>`;
+
+  /* 【改修①】加工②が空の場合はフロー図に表示しない */
+  /* 【改修⑦】社内検査→立会検査の順に変更 */
+  const buildFlowNodes=()=>{
+    const nodes=[];
+    (o.group1||[]).forEach((s,i)=>{
+      const r=qty>0?(parseInt(s.done)||0)/qty:0;
+      nodes.push({type:'step',gk:'group1',s,i,r,color:'#6366f1'});
+    });
+    if(o.heatTreat)nodes.push({type:'option',icon:'🔥',label:'熱処理',color:'#f97316',date:o.heatTreatReturnDate});
+    if(o.outsource)nodes.push({type:'option',icon:'🚚',label:'外注',color:'#8b5cf6',date:o.outsourceReturnDate});
+    /* 加工②が設定されている場合のみ表示 */
+    if(g2Exists){
+      (o.group2||[]).forEach((s,i)=>{
+        const r=qty>0?(parseInt(s.done)||0)/qty:0;
+        nodes.push({type:'step',gk:'group2',s,i,r,color:'#06b6d4'});
+      });
+    }
+    /* 社内検査→立会検査の順 */
+    if(o.internalInspection)nodes.push({type:'option',icon:'🏭',label:'社内検査',color:'#22d3ee',date:o.internalInspectionDate});
+    if(o.inspection)nodes.push({type:'option',icon:'🔍',label:'立会検査',color:'#10b981',date:o.inspectionDate});
+    return nodes;
+  };
+
+  const flowNodes=buildFlowNodes();
+  const flowHTML=flowNodes.map((n,idx)=>{
+    const arrow=idx<flowNodes.length-1?`<div class="flow-arrow">→</div>`:'';
+    if(n.type==='option'){
+      return`<div class="flow-node option-node" style="border-color:${n.color}44">
+        <div style="font-size:18px">${n.icon}</div>
+        <div style="font-size:10px;font-weight:700;color:${n.color};margin-top:3px">${n.label}</div>
+        ${n.date?`<div style="font-size:9px;color:#475569;margin-top:2px">${fmt(n.date)}</div>`:''}
+      </div>${arrow}`;
+    }
+    const {s,gk,r,color}=n;
+    const mn=machineName(s.machineId);const wn=workerName(s.operatorId);
+    const doneS=(parseInt(s.done)||0)>=qty&&qty>0;
+    return`<div class="flow-node ${gk==='group1'?'g1':'g2'}" style="opacity:${doneS?.7:1}">
+      <div style="font-size:10px;font-weight:700;color:${color};margin-bottom:4px">${esc(s.name)}</div>
+      ${mn?`<div style="font-size:9px;color:#475569">🔧${esc(mn)}</div>`:''}
+      ${wn?`<div style="font-size:9px;color:#475569">👤${esc(wn)}</div>`:''}
+      <div class="flow-prog-bar"><div class="flow-prog-inner" style="width:${Math.min(r*100,100)}%;background:${sc(r)}"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <span style="font-size:9px;color:#475569">${parseInt(s.done)||0}/${qty}個</span>
+        <span style="font-size:10px;font-weight:700;color:${sc(r)}">${doneS?'✅':Math.round(r*100)+'%'}</span>
+      </div>
+    </div>${arrow}`;
+  }).join('');
+
+  const buildStepCard=(s,gk,i)=>{
+    const r=qty>0?(parseInt(s.done)||0)/qty:0;const doneS=(parseInt(s.done)||0)>=qty&&qty>0;
+    const rem=Math.max(0,qty-(parseInt(s.done)||0));const h=parseFloat(s.hoursPerUnit)||0;const mc=Math.max(1,parseInt(s.machineCount)||1);
+    const mn=machineName(s.machineId);const wn=workerName(s.operatorId);
+    return`<div class="card" style="border-color:${gk==='group1'?'#6366f1':'#06b6d4'}30;${doneS?'opacity:.6':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="background:${gk==='group1'?'#6366f1':'#06b6d4'};color:#fff;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:900">${esc(s.name)}</span>
+          ${mn?`<span style="color:#475569;font-size:11px">🔧${esc(mn)}</span>`:''}
+          ${wn?`<span style="color:#475569;font-size:11px">👤${esc(wn)}</span>`:''}
+        </div>
+        <span style="color:${sc(r)};font-weight:700;font-size:12px">${doneS?'✅完了':r>0?'⚙️作業中':'⏳未着手'}</span>
+      </div>
+      ${bar(r,sc(r),10)}
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+        <span style="color:#64748b;font-size:12px">完了個数</span>
+        <input type="number" min="0" max="${qty}" value="${parseInt(s.done)||0}" class="step-prog" data-oid="${o.id}" data-gk="${gk}" data-sid="${s.id}" style="background:#0d1117;border:1px solid ${sc(r)}60;border-radius:7px;padding:7px 10px;font-size:18px;font-weight:900;width:76px;text-align:center;outline:none">
+        <span style="color:#334155;font-size:16px">/</span><span style="color:#64748b;font-size:15px">${qty}個</span>
+        <span style="margin-left:auto;color:${sc(r)};font-weight:900;font-size:19px">${Math.round(r*100)}%</span>
+      </div>
+      ${h>0&&rem>0?`<div style="margin-top:6px;font-size:11px;color:#475569">残${rem}個 × ${hhmm(h)}${mc>1?` ÷ ${mc}台`:''} = <span style="color:#94a3b8;font-weight:700">${hhmm(h*rem/mc)}</span></div>`:''}
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+        <label style="color:#475569;font-size:10px;font-weight:700;white-space:nowrap">実績(h)</label>
+        <input type="number" min="0" step="0.5" value="${s.actualHours||''}" placeholder="実績時間" class="step-actual" data-oid="${o.id}" data-gk="${gk}" data-sid="${s.id}" style="max-width:100px;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:5px 8px;font-size:12px;outline:none;color:#e2e8f0">
+      </div>
+    </div>`;
+  };
+
+  /* 【指摘②】加工②が空でも常に最長・最短を両方表示
+     G2空の場合: 最短=最長になる */
+  const buildRemainCard=()=>{
+    if(isDone(o))return'';
+    const risk=calcRisk(o);
+    if(risk.level==='none')return'';
+    const optD=(risk.opt/dh).toFixed(1);
+    const pesD=(risk.pes/dh).toFixed(1);
+    const riskCls={'ok':'risk-ok','warn':'risk-warn','ng':'risk-ng','over':'risk-ng'}[risk.level]||'risk-ok';
+    /* 【指摘B】目標日（検査優先） */
+    const tgt=risk.targetDate?{date:risk.targetDate,label:risk.targetLabel,isInspection:risk.isInspection}:null;
+    /* 【指摘D】終了予定日を稼働日ベースで計算 */
+    const finishDate=calcFinishDate(pes,dh);
+    const finishDateOpt=calcFinishDate(opt,dh);
+    /* 終了予定日と目標日の関係 */
+    let finishStatusCls='color:#10b981',finishStatusMsg='';
+    if(tgt&&finishDate){
+      if(finishDate>tgt.date){finishStatusCls='color:#ef4444';finishStatusMsg=`⚠️ ${tgt.label}(${fmtMD(tgt.date)})より${diffDays(finishDate)-diffDays(tgt.date)}日遅延見込`;}
+      else{finishStatusMsg=`✅ ${tgt.label}(${fmtMD(tgt.date)})に間に合う`;}
+    }
+
+    /* 【指摘⑤】置き場在庫×ボタン */
+    const storageTxt=stot>0?`<div style="margin-top:8px;padding:10px 12px;background:#1c1400;border:1px solid #f59e0b30;border-radius:8px;font-size:13px;color:#f59e0b">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span>📦 置き場在庫: 合計 <strong style="font-size:16px">${stot}個</strong></span>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:6px">
+        ${STORAGE_PLACES.filter(p=>(parseInt(o.storageQty&&o.storageQty[p])||0)>0).map(p=>`
+          <span style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;margin-bottom:4px">
+            <span>${esc(p)}: ${parseInt(o.storageQty[p])}個</span>
+            <button type="button" class="storage-del-detail" data-oid="${o.id}" data-place="${esc(p)}" style="background:#2d0a0a;border:1px solid #ef444460;color:#f87171;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;cursor:pointer">✕</button>
+          </span>
+        `).join('')}
+      </div>
+    </div>`:'';
+
+    /* 【指摘D】終了予定日カード（最重要表示） */
+    const finishCard=finishDate?`<div style="background:linear-gradient(135deg,#0a1a0a,#0a0f18);border:2px solid #10b98150;border-radius:12px;padding:18px;margin-bottom:10px;text-align:center">
+      <div style="color:#64748b;font-size:11px;letter-spacing:2px;margin-bottom:4px">🎯 完了予定日</div>
+      <div style="color:#10b981;font-weight:900;font-size:34px;line-height:1.1">${fmtMD(finishDate)}</div>
+      ${hasGroup2(o)&&finishDateOpt&&finishDateOpt!==finishDate?`<div style="color:#94a3b8;font-size:12px;margin-top:4px">最短: ${fmtMD(finishDateOpt)} 〜 最長: ${fmtMD(finishDate)}</div>`:''}
+      ${finishStatusMsg?`<div style="font-weight:700;font-size:13px;margin-top:6px;${finishStatusCls}">${finishStatusMsg}</div>`:''}
+    </div>`:'';
+
+    /* 【指摘F】G2が無い場合は単一表示、あれば最長/最短両方表示 */
+    const timeCards=hasGroup2(o)?`
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="flex:2;min-width:140px;background:#0a0f18;border-radius:10px;padding:14px;text-align:center;border:2px solid #94a3b860">
+          <div class="remain-lbl" style="font-size:12px;font-weight:700;color:#94a3b8">🔸 最長（順番処理）</div>
+          <div class="remain-val" style="color:#e2e8f0;font-size:28px">${pesD}<span style="font-size:15px;color:#475569"> 日</span></div>
+        </div>
+        <div style="flex:1;min-width:100px;background:#0a0f18;border-radius:10px;padding:10px;text-align:center;border:1px solid #6366f140">
+          <div class="remain-lbl" style="font-size:10px">最短（並行処理）</div>
+          <div class="remain-val" style="color:#6366f1;font-size:20px">${optD}<span style="font-size:12px;color:#475569"> 日</span></div>
+        </div>
+        <div style="flex:1;min-width:100px;background:#0a0f18;border-radius:10px;padding:10px;text-align:center;border:1px solid #334155">
+          <div class="remain-lbl">${tgt?tgt.label:'納期'}まで</div>
+          <div class="remain-val" style="color:${risk.daysLeft>=0?'#22d3ee':'#ef4444'};font-size:20px">${risk.daysLeft!==null?risk.daysLeft:'―'}<span style="font-size:12px;color:#475569"> 稼働日</span></div>
+        </div>
+      </div>`
+    :`
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="flex:2;min-width:140px;background:#0a0f18;border-radius:10px;padding:14px;text-align:center;border:2px solid #94a3b860">
+          <div class="remain-lbl" style="font-size:12px;font-weight:700;color:#94a3b8">必要時間</div>
+          <div class="remain-val" style="color:#e2e8f0;font-size:28px">${pesD}<span style="font-size:15px;color:#475569"> 日</span></div>
+        </div>
+        <div style="flex:1;min-width:100px;background:#0a0f18;border-radius:10px;padding:10px;text-align:center;border:1px solid #334155">
+          <div class="remain-lbl">${tgt?tgt.label:'納期'}まで</div>
+          <div class="remain-val" style="color:${risk.daysLeft>=0?'#22d3ee':'#ef4444'};font-size:20px">${risk.daysLeft!==null?risk.daysLeft:'―'}<span style="font-size:12px;color:#475569"> 稼働日</span></div>
+        </div>
+      </div>`;
+
+    return`
+    ${finishCard}
+    <div class="remain-card">
+      ${timeCards}
+      <div style="padding:10px 14px;background:#0a0f18;border-radius:10px;font-size:15px;font-weight:700" class="${riskCls}">
+        ${risk.label}
+      </div>
+      ${storageTxt}
+      <button class="calc-toggle" onclick="this.nextElementSibling.classList.toggle('open');this.textContent=this.nextElementSibling.classList.contains('open')?'▲ 計算方法を閉じる':'▼ 計算方法を見る'">▼ 計算方法を見る</button>
+      <div class="calc-detail">
+        <strong style="color:#e2e8f0;font-size:14px">【計算方法】</strong><br><br>
+        ${hasGroup2(o)?`🔸 <strong>最長（保守値・基本これを見る）</strong><br>
+        　工程１と工程②を全て順番に終わらせた場合の合計時間。<br><br>
+        ✅ <strong>最短（並行処理）</strong><br>
+        　工程１全部 + 工程②の最後の1個分。<br>`
+        :`必要時間＝加工①の全工程を順番に終わらせた時間です。<br>`}
+        熱処理・外注の待ち日数も加算。<br><br>
+        <strong style="color:#e2e8f0">🎯 完了予定日</strong> は「今日 + 必要日数」を稼働日（日曜・休日除外）で計算。<br><br>
+        <strong style="color:#e2e8f0">【判定基準（稼働日ベース）】</strong><br>
+        🔴 残り9稼働日以下 → 🚨 要注意<br>
+        🟡 残り19稼働日以下 → ⚡ 注意<br>
+        🟢 残り20稼働日以上 → ✅ 余裕あり<br>
+        ${tgt&&tgt.isInspection?`<br>📌 検査日がある場合はそれまでの稼働日数で判定`:''}
+      </div>
+    </div>`;
+  };
+
+  return`<div class="up">
+  <div class="hdr">
+    <button id="back-btn" style="background:none;color:#94a3b8;font-size:13px;padding:4px 8px">← 戻る</button>
+    <span style="font-weight:800;color:#e2e8f0">📊 進捗管理</span>
+    <button id="edit-btn" style="background:#334155;border-radius:7px;color:#e2e8f0;padding:5px 12px;font-size:12px">✏️ 編集</button>
+  </div>
+  <div class="wrap" style="max-width:700px">
+    <div class="card" style="background:${done?'linear-gradient(135deg,#052e16,#0f2820)':'linear-gradient(135deg,#1a1a2e,#161b22)'};border-color:${done?'#10b98150':'#4338ca40'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+            <span style="background:#0d1117;color:#6366f1;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:700">${esc(o.seiban)||'整番―'}</span>
+            ${o.caution?`<span class="tag pulse" style="background:#450a0a;color:#ef4444">⚠️ 要注意</span>`:''}
+            ${o.heatTreat?`<span class="tag" style="background:#1c0a00;color:#f97316">🔥</span>`:''}
+            ${o.outsource?`<span class="tag" style="background:#1e0a3c;color:#8b5cf6">🚚</span>`:''}
+            ${o.internalInspection?`<span class="tag" style="background:#0c1a1f;color:#22d3ee">🏭</span>`:''}
+            ${o.inspection?`<span class="tag" style="background:#052e16;color:#10b981">🔍</span>`:''}
+          </div>
+          <h2 style="color:#e2e8f0;font-size:17px;font-weight:900;margin-bottom:3px">${esc(o.product)||'（製品名なし）'}</h2>
+          <p style="color:#94a3b8;font-size:12px">${esc(o.client)||'―'} ／ ${esc(o.material)||'―'}</p>
+        </div>
+        <div class="tag ${ds.cls}" style="border-radius:8px;padding:7px 12px;text-align:center;min-width:70px">
+          <div style="font-weight:900;font-size:13px">${ds.label}</div>
+          ${o.deadline?`<div style="font-size:10px;margin-top:1px;opacity:.8">${fmtFull(o.deadline)}</div>`:''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:${totalH>0?'10':'0'}px">
+        ${[['受注個数',`${qty}個`],['稼働時間',`${dh.toFixed(1)}h/日`],['材質',esc(o.material)||'―']].map(([k,v])=>`<div style="background:#0d111770;border-radius:7px;padding:6px 8px"><div style="color:#475569;font-size:9px;letter-spacing:1px">${k}</div><div style="color:#e2e8f0;font-weight:700;font-size:12px">${v}</div></div>`).join('')}
+      </div>
+      ${totalH>0?`<div style="background:#0d111780;border-radius:7px;padding:8px 12px"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:12px"><span style="color:#94a3b8">残必要: <strong style="color:#e2e8f0">${hhmm(totalH)}</strong></span><span style="color:#94a3b8">≈<strong style="color:#e2e8f0">${Math.ceil(totalH/dh)}日</strong></span>${feas.label?`<span class="${feas.cls}" style="font-weight:700">${feas.label}</span>`:''}</div>${feas.detail?`<p style="color:#64748b;font-size:11px;margin-top:2px">${feas.detail}</p>`:''}</div>`:''}
+      ${o.caution&&o.cautionNote?`<div style="margin-top:8px;padding:7px 10px;background:#450a0a;border:1px solid #ef444440;border-radius:7px;color:#f87171;font-size:12px">⚠️ ${esc(o.cautionNote)}</div>`:''}
+    </div>
+
+    ${buildRemainCard()}
+
+    <div class="card">
+      <p style="color:#818cf8;font-weight:700;font-size:12px;letter-spacing:1px;margin-bottom:12px">🔄 工程フロー</p>
+      <div class="flow-wrap">
+        <div class="flow-row">${flowHTML}</div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:3px;background:#6366f1;border-radius:99px"></div><span style="font-size:10px;color:#475569">工程グループ１</span></div>
+        ${g2Exists?`<div style="display:flex;align-items:center;gap:5px"><div style="width:12px;height:3px;background:#06b6d4;border-radius:99px"></div><span style="font-size:10px;color:#475569">工程グループ２</span></div>`:''}
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="width:4px;height:20px;background:#6366f1;border-radius:2px"></div>
+      <span style="color:#818cf8;font-weight:700;font-size:13px">工程グループ１</span>
+    </div>
+    ${(o.group1||[]).map((s,i)=>buildStepCard(s,'group1',i)).join('')}
+
+    ${o.heatTreat||o.outsource?`<div style="display:flex;gap:8px;margin:10px 0;padding:10px;background:#0d1117;border-radius:8px;border:1px solid #21262d;flex-wrap:wrap">
+      ${o.heatTreat?`<span style="background:#1c0a00;color:#f97316;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">🔥 熱処理あり${o.heatTreatReturnDate?` (戻り: ${fmt(o.heatTreatReturnDate)})`:''}</span>`:''}
+      ${o.outsource?`<span style="background:#1e0a3c;color:#8b5cf6;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">🚚 外注あり${o.outsourceReturnDate?` (戻り: ${fmt(o.outsourceReturnDate)})`:''}</span>`:''}
+    </div>`:''}
+
+    ${g2Exists?`
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:4px;height:20px;background:#06b6d4;border-radius:2px"></div>
+        <span style="color:#06b6d4;font-weight:700;font-size:13px">工程グループ２</span>
+      </div>
+      ${(o.group2||[]).map((s,i)=>buildStepCard(s,'group2',i)).join('')}
+    `:''}
+
+    ${o.internalInspection||o.inspection?`<div style="margin-top:4px;padding:10px;background:#0d1117;border-radius:8px;border:1px solid #21262d">
+      ${o.internalInspection?`<div style="color:#22d3ee;font-size:12px;margin-bottom:4px">🏭 社内検査: ${fmtFull(o.internalInspectionDate)}</div>`:''}
+      ${o.inspection?`<div style="color:#10b981;font-size:12px">🔍 立会検査: ${fmtFull(o.inspectionDate)}</div>`:''}
+    </div>`:''}
+
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <button id="edit-btn2" class="btn-s" style="flex:1">✏️ 詳細編集</button>
+      <button id="del-btn" class="btn-d">🗑 削除</button>
+    </div>
+  </div></div>`;
+}
+
+/* ===== DAILY (日報画面) ===== */
+/* 【指摘①】残業時間を担当者別に入力 */
+function buildDaily(){
+  const date=S.dailyDate;
+  const daily=getDailyNotes(date);
+  const baseH=calcDailyH();
+  const otMap=daily.overtimeByWorker||{};
+  /* 合計残業時間を計算 */
+  const totalOt=Object.values(otMap).reduce((s,v)=>s+(parseFloat(v)||0),0);
+  const workerCount=Object.keys(otMap).filter(k=>(parseFloat(otMap[k])||0)>0).length;
+  const dw=['日','月','火','水','木','金','土'][new Date(date+'T00:00:00').getDay()];
+  const teamFilter=S.dailyTeam;
+  const activeOrders=orders.filter(o=>!isDone(o));
+  const workerGroups=[];
+  if(teamFilter==='全班'||teamFilter==='職長'){
+    const shokucho=masters.workers.filter(w=>w.role==='職長');
+    if(shokucho.length)workerGroups.push({label:'🏭 職長',color:'#f59e0b',workers:shokucho});
+  }
+  TEAMS.forEach(team=>{
+    if(teamFilter!=='全班'&&teamFilter!==team)return;
+    const tc=TEAM_COLORS[team];
+    const hancho=masters.workers.filter(w=>w.team===team&&w.role==='班長');
+    const workers=masters.workers.filter(w=>w.team===team&&w.role!=='班長'&&w.role!=='職長');
+    const all=[...hancho,...workers];
+    if(all.length>0||teamFilter===team)workerGroups.push({label:team,color:tc,workers:all,isTeam:true});
+  });
+  const getWorkerTasks=wid=>{
+    const tasks=[];
+    activeOrders.forEach(o=>{
+      const allSteps=[...(o.group1||[]).map(s=>({...s,gk:'group1'})),...(o.group2||[]).map(s=>({...s,gk:'group2'}))];
+      allSteps.forEach(s=>{
+        if(s.operatorId!=wid)return;
+        const q=parseInt(o.qty)||0;const d=parseInt(s.done)||0;
+        if(d>=q&&q>0)return;
+        tasks.push({order:o,step:s,ratio:q>0?d/q:0});
+      });
+    });
+    return tasks;
+  };
+  const memos=daily.meetings||[];
+  const asa=memos.filter(m=>m.session==='朝');
+  const hiru=memos.filter(m=>m.session==='昼');
+  const memoSection=(session,items)=>`
+    <div style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="color:${session==='朝'?'#fbbf24':'#06b6d4'};font-weight:700;font-size:12px">${session==='朝'?'🌅 朝の会':'🌆 昼の会'}</span>
+        <button onclick="addMeeting('${session}')" style="background:#1e293b;border:1px solid #334155;border-radius:6px;color:#94a3b8;padding:4px 10px;font-size:11px;font-weight:700">＋ 追加</button>
+      </div>
+      ${items.length===0?`<p style="color:#334155;font-size:11px;text-align:center;padding:8px">連絡事項なし</p>`:''}
+      ${items.map(m=>`
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:${m.checked?'#0a110a':'#0d1117'};border-radius:8px;border:1px solid ${m.checked?'#10b98130':'#21262d'};margin-bottom:6px;opacity:${m.checked?.6:1}">
+          <input type="checkbox" id="chk-${m.id}" ${m.checked?'checked':''} onchange="toggleMeeting(${m.id})" style="margin-top:2px;flex-shrink:0">
+          <textarea id="memo-${m.id}" placeholder="連絡内容を入力..." style="flex:1;background:transparent;border:none;resize:none;height:48px;font-size:12px;color:${m.checked?'#475569':'#e2e8f0'};text-decoration:${m.checked?'line-through':'none'}">${esc(m.text)}</textarea>
+          <button onclick="delMeeting(${m.id})" style="background:none;border:none;color:#334155;font-size:14px;padding:2px;flex-shrink:0">✕</button>
+        </div>`).join('')}
+    </div>`;
+  return`<div class="up">
+  <div class="hdr">
+    <div><div style="font-weight:900;color:#e2e8f0;font-size:14px">📊 日報</div><div style="color:#6366f1;font-size:9px;letter-spacing:2px">DAILY PROGRESS</div></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input type="date" id="daily-date" value="${date}" style="background:#0d1117;border-color:#334155;font-size:12px;padding:5px 8px;width:auto">
+      <button id="lock-btn" style="background:none;font-size:18px;padding:4px">🔒</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div style="text-align:center;margin-bottom:12px;padding:10px;background:#161b22;border-radius:10px;border:1px solid #21262d">
+      <span style="color:#e2e8f0;font-size:16px;font-weight:900">${fmtFull(date)} (${dw})</span>
+      ${date===todayStr()?`<span style="background:#6366f1;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;margin-left:8px">TODAY</span>`:''}
+    </div>
+
+    <!-- 【指摘①】本日の稼働時間（基本勤務時間＋各担当者の残業合計を表示） -->
+    <div class="card" style="border-color:#f59e0b30;background:linear-gradient(135deg,#161b22,#1a1400);margin-bottom:12px">
+      <p style="color:#f59e0b;font-weight:700;font-size:12px;letter-spacing:1px;margin-bottom:10px">🕐 本日の稼働時間（全体）</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="background:#0d1117;border-radius:8px;padding:10px;text-align:center">
+          <div style="color:#64748b;font-size:10px;letter-spacing:1px">基本勤務</div>
+          <div style="color:#e2e8f0;font-weight:900;font-size:18px;line-height:1.2">${baseH.toFixed(1)}<span style="font-size:11px;color:#475569">h</span></div>
+        </div>
+        <div style="background:#0d1117;border-radius:8px;padding:10px;text-align:center">
+          <div style="color:#64748b;font-size:10px;letter-spacing:1px">残業合計</div>
+          <div style="color:#f59e0b;font-weight:900;font-size:18px;line-height:1.2">${totalOt.toFixed(1)}<span style="font-size:11px;color:#475569">h</span></div>
+          <div style="color:#64748b;font-size:10px;margin-top:2px">${workerCount}名</div>
+        </div>
+        <div style="background:#0a0f18;border:1px solid #10b98140;border-radius:8px;padding:10px;text-align:center">
+          <div style="color:#10b981;font-size:10px;letter-spacing:1px;font-weight:700">のべ稼働</div>
+          <div style="color:#10b981;font-weight:900;font-size:18px;line-height:1.2">${totalOt.toFixed(1)}<span style="font-size:11px">h</span></div>
+          <div style="color:#64748b;font-size:10px;margin-top:2px">(残業分)</div>
+        </div>
+      </div>
+      <p style="color:#64748b;font-size:10px;margin-top:8px">※ 残業時間は各担当者のカードに入力してください（納期計算には影響しません）</p>
+    </div>
+
+    <div style="display:flex;background:#161b22;border:1px solid #21262d;border-radius:9px;overflow:hidden;margin-bottom:12px;position:sticky;top:46px;z-index:50;box-shadow:0 4px 8px #000a">
+      ${['全班','1班','2班','3班'].map(t=>`<button onclick="set({dailyTeam:'${t}'})" style="flex:1;background:${S.dailyTeam===t?'linear-gradient(135deg,#4f46e5,#7c3aed)':'#161b22'};border:none;color:${S.dailyTeam===t?'#fff':'#64748b'};padding:8px 4px;font-weight:700;font-size:12px">${t}</button>`).join('')}
+    </div>
+    ${workerGroups.length===0?`<div style="text-align:center;padding:30px;color:#475569"><p>作業員が登録されていません</p></div>`:''}
+    ${workerGroups.map(g=>`
+      <div style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="width:4px;height:20px;background:${g.color};border-radius:2px"></div>
+          <span style="color:${g.color};font-weight:900;font-size:14px">${esc(g.label)}</span>
+          <div style="height:1px;flex:1;background:#21262d"></div>
+          <span style="color:#475569;font-size:11px">${g.workers.length}名</span>
+        </div>
+        ${g.workers.map(w=>{
+          const tasks=getWorkerTasks(w.id);
+          const mn=machineName(w.mainMachineId);
+          const workerOt=parseFloat(otMap[w.id])||0;
+          return`<div style="background:#161b22;border:1px solid #21262d;border-radius:10px;padding:12px;margin-bottom:8px;border-left:4px solid ${g.color}">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+              <span style="font-weight:800;color:#e2e8f0;font-size:13px">${esc(w.name)}</span>
+              <span class="tag ${ROLE_CLS[w.role]||'role-worker'}" style="border-radius:5px;padding:2px 7px;font-size:10px">${esc(w.role)}</span>
+              ${mn?`<span style="color:#475569;font-size:11px">🔧${esc(mn)}</span>`:''}
+              ${tasks.length===0?`<span style="color:#334155;font-size:11px">待機中</span>`:''}
+              <!-- 【指摘①】担当者別の残業時間入力 -->
+              <div style="margin-left:auto;display:flex;align-items:center;gap:5px;background:#0d1117;border:1px solid ${workerOt>0?'#f59e0b60':'#21262d'};border-radius:6px;padding:3px 8px">
+                <span style="color:#f59e0b;font-size:10px;font-weight:700">残業</span>
+                <input type="number" min="0" step="0.5" value="${workerOt>0?workerOt:''}" placeholder="0" class="worker-ot" data-wid="${w.id}" style="width:50px;background:transparent;border:none;padding:2px 4px;font-size:13px;font-weight:700;color:#f59e0b;text-align:center;outline:none">
+                <span style="color:#64748b;font-size:10px">h</span>
+              </div>
+            </div>
+            ${tasks.map(t=>{
+              const q=parseInt(t.order.qty)||0;const d=parseInt(t.step.done)||0;const r=q>0?d/q:0;
+              const ds=dlStatus(t.order,false);
+              return`<div style="background:#0a0f18;border:1px solid #21262d;border-radius:8px;padding:9px 12px;margin-bottom:6px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <div><span style="color:#6366f1;font-size:10px;font-weight:700">${esc(t.order.seiban)||'―'}</span><span style="color:#e2e8f0;font-size:12px;font-weight:700;margin-left:6px">${esc(t.order.product)||'―'}</span></div>
+                  <span class="tag ${ds.cls}" style="border-radius:5px;padding:2px 6px;font-size:10px">${ds.label}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+                  <span style="background:#6366f120;color:#818cf8;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700">${esc(t.step.name)}</span>
+                </div>
+                <div style="height:6px;background:#1e293b;border-radius:99px;overflow:hidden;margin-bottom:6px">
+                  <div style="height:100%;width:${r*100}%;background:${sc(r)};border-radius:99px"></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="color:#64748b;font-size:11px">完了:</span>
+                  <input type="number" min="0" max="${q}" value="${d}" class="step-prog" data-oid="${t.order.id}" data-gk="${t.step.gk}" data-sid="${t.step.id}" style="width:64px;text-align:center;padding:5px 6px;font-size:14px;font-weight:700;background:#0d1117;border:1px solid ${sc(r)}50;border-radius:6px;color:#e2e8f0;outline:none">
+                  <span style="color:#475569;font-size:12px">/ ${q}個</span>
+                  <span style="margin-left:auto;color:${sc(r)};font-weight:700;font-size:14px">${Math.round(r*100)}%</span>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>`;
+        }).join('')}
+      </div>`).join('')}
+    <div class="card" style="border-color:#fbbf2430;margin-top:4px">
+      <p style="color:#fbbf24;font-weight:700;font-size:12px;letter-spacing:1px;margin-bottom:14px">📝 連絡メモ（朝の会・昼の会）</p>
+      ${memoSection('朝',asa)}
+      ${memoSection('昼',hiru)}
+    </div>
+  </div></div>`;
+}
+
+/* ===== CALENDAR ===== */
+function buildCalendar(){
+  const y=S.calYear,m=S.calMonth;
+  const monthName=`${y}年${m+1}月`;
+  const firstDay=new Date(y,m,1).getDay();
+  const daysInMonth=new Date(y,m+1,0).getDate();
+  const today=todayStr();
+  const selDate=S.calSelDate;
+  const selEvents=eventsOnDate(selDate);
+  const holidays=calEvents.filter(e=>e.type==='holiday').map(e=>e.date);
+  const cells=[];
+  for(let i=firstDay-1;i>=0;i--)cells.push({date:addDays(`${y}-${String(m+1).padStart(2,'0')}-01`,-i-1),otherMonth:true});
+  for(let d=1;d<=daysInMonth;d++){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;cells.push({date:ds,otherMonth:false});}
+  const rem=cells.length%7?7-cells.length%7:0;
+  for(let d=1;d<=rem;d++)cells.push({date:addDays(`${y}-${String(m+1).padStart(2,'0')}-01`,d-1+daysInMonth),otherMonth:true});
+  const weeks=[];for(let i=0;i<cells.length;i+=7)weeks.push(cells.slice(i,i+7));
+  return`<div class="up">
+  <div class="hdr">
+    <div><div style="font-weight:900;color:#e2e8f0;font-size:14px">🗓 カレンダー</div><div style="color:#6366f1;font-size:9px;letter-spacing:2px">CALENDAR</div></div>
+    <button id="lock-btn" style="background:none;font-size:18px;padding:4px">🔒</button>
+  </div>
+  <div class="wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <button onclick="calPrev()" style="background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;padding:7px 14px;font-size:16px;font-weight:700">‹</button>
+      <span style="color:#e2e8f0;font-size:17px;font-weight:900">${monthName}</span>
+      <button onclick="calNext()" style="background:#1e293b;border:1px solid #334155;border-radius:8px;color:#e2e8f0;padding:7px 14px;font-size:16px;font-weight:700">›</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      ${Object.entries(EVENT_TYPES).map(([k,v])=>`<span style="background:${v.bg};color:${v.color};border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700">${v.label}</span>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">
+      ${['日','月','火','水','木','金','土'].map((d,i)=>`<div style="text-align:center;font-size:11px;font-weight:700;color:${i===0?'#ef4444':i===6?'#3b82f6':'#64748b'};padding:4px 0">${d}</div>`).join('')}
+      ${weeks.map(week=>week.map((cell,wi)=>{
+        const dow=wi;const isToday=cell.date===today;
+        const isHoliday=holidays.includes(cell.date)||dow===0;
+        const isSel=cell.date===selDate;
+        const evs=eventsOnDate(cell.date);
+        const dd=parseInt(cell.date.split('-')[2]);
+        return`<div class="cal-day${isToday?' today':''}${isHoliday&&!cell.otherMonth?' holiday':''}${cell.otherMonth?' other-month':''}" onclick="calSelectDay('${cell.date}')" style="border-color:${isSel?'#6366f1':'#21262d'};${isSel?'box-shadow:0 0 0 2px #6366f140':''}">
+          <div class="cal-num" style="color:${dow===0&&!cell.otherMonth?'#ef4444':dow===6&&!cell.otherMonth?'#3b82f6':''}">${dd}</div>
+          <div style="margin-top:2px">${evs.slice(0,2).map(e=>`<div style="background:${e.color||'#6366f1'}22;color:${e.color||'#6366f1'};border-radius:3px;padding:0 3px;font-size:9px;font-weight:700;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.title)}</div>`).join('')}${evs.length>2?`<div style="color:#475569;font-size:9px">+${evs.length-2}</div>`:''}</div>
+        </div>`;
+      }).join('')).join('')}
+    </div>
+    <div class="card" style="border-color:#6366f140">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+        <span style="color:#818cf8;font-weight:700;font-size:12px">${fmtFull(selDate)} の予定</span>
+        <div style="display:flex;gap:6px">
+          <!-- 【指摘A】選択日を休日に設定/解除するクイックボタン -->
+          ${(()=>{
+            const isH=calEvents.some(e=>e.date===selDate&&e.type==='holiday');
+            return isH
+              ?`<button onclick="toggleHoliday('${selDate}')" style="background:#450a0a;border:1px solid #ef444460;border-radius:7px;color:#f87171;padding:5px 12px;font-size:12px;font-weight:700">🔴 休日解除</button>`
+              :`<button onclick="toggleHoliday('${selDate}')" style="background:#2d0a0a;border:1px solid #ef444460;border-radius:7px;color:#ef4444;padding:5px 12px;font-size:12px;font-weight:700">🔴 休日に設定</button>`;
+          })()}
+          <button onclick="calOpenAdd()" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;border-radius:7px;color:#fff;padding:5px 12px;font-size:12px;font-weight:700">＋ 予定追加</button>
+        </div>
+      </div>
+      ${selEvents.length===0?`<p style="color:#334155;font-size:12px;text-align:center;padding:10px">予定なし</p>`:''}
+      ${selEvents.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0d1117;border-radius:8px;margin-bottom:6px;border-left:3px solid ${e.color||'#6366f1'}">
+        <span style="background:${EVENT_TYPES[e.type]?.bg||'#1e293b'};color:${e.color||'#6366f1'};border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">${EVENT_TYPES[e.type]?.label||''}</span>
+        <span style="color:#e2e8f0;font-size:12px;flex:1">${esc(e.title)}</span>
+        <button onclick="calEdit(${e.id})" style="background:none;border:none;color:#64748b;font-size:12px;padding:2px 4px">✏️</button>
+        <button onclick="calDel(${e.id})" style="background:none;border:none;color:#475569;font-size:12px;padding:2px 4px">🗑</button>
+      </div>`).join('')}
+    </div>
+
+    <!-- 【指摘A】今月の休日一覧 -->
+    <div class="card" style="border-color:#ef444430">
+      <p style="color:#f87171;font-weight:700;font-size:12px;margin-bottom:8px">🔴 今月の休日（${y}年${m+1}月）</p>
+      <p style="color:#475569;font-size:11px;margin-bottom:8px">※ 日曜日は自動的に休日扱い。ここで追加できるのは土曜日や祝日など。</p>
+      ${(()=>{
+        const monthPrefix=`${y}-${String(m+1).padStart(2,'0')}`;
+        const holidays=calEvents.filter(e=>e.type==='holiday'&&e.date&&e.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date));
+        if(holidays.length===0)return `<p style="color:#334155;font-size:12px;text-align:center;padding:8px">祝日など休日設定なし</p>`;
+        return holidays.map(h=>`<div style="display:inline-flex;align-items:center;gap:5px;background:#2d0a0a;border:1px solid #ef444440;border-radius:6px;padding:4px 10px;margin-right:6px;margin-bottom:4px">
+          <span style="color:#ef4444;font-size:12px;font-weight:700">${fmtMD(h.date)}</span>
+          <span style="color:#94a3b8;font-size:11px">${esc(h.title)}</span>
+          <button onclick="calDel(${h.id})" style="background:none;border:none;color:#64748b;font-size:12px;padding:0 2px;cursor:pointer">✕</button>
+        </div>`).join('');
+      })()}
+    </div>
+    ${(()=>{
+      const mo=orders.filter(o=>o.deadline&&o.deadline.startsWith(`${y}-${String(m+1).padStart(2,'0')}`));
+      if(!mo.length)return'';
+      return`<div class="card" style="border-color:#4338ca40">
+        <p style="color:#818cf8;font-weight:700;font-size:12px;margin-bottom:8px">📋 今月が納期の工程 (${mo.length}件)</p>
+        ${mo.map(o=>{const ds=dlStatus(o,isDone(o));return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #21262d12;cursor:pointer" onclick="set({view:'detail',eid:${o.id}})">
+          <span class="tag ${ds.cls}" style="border-radius:5px;padding:2px 6px;font-size:10px;min-width:52px;text-align:center">${ds.label}</span>
+          <span style="color:#e2e8f0;font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.product)||'―'}</span>
+          <span style="color:#64748b;font-size:11px">${fmt(o.deadline)}</span>
+        </div>`;}).join('')}
+      </div>`;
+    })()}
+  </div>
+  ${S.calModal?`<div style="position:fixed;inset:0;background:#000a;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:14px;padding:20px;width:100%;max-width:340px">
+      <p style="color:#e2e8f0;font-weight:800;font-size:14px;margin-bottom:14px">${S.calEditId?'予定を編集':'予定を追加'} — ${fmtFull(selDate)}</p>
+      <div style="margin-bottom:10px"><label class="lbl">種別</label>
+        <select id="cal-type" style="width:100%">${Object.entries(EVENT_TYPES).map(([k,v])=>`<option value="${k}" ${S.calForm.type===k?'selected':''}>${v.label}</option>`).join('')}</select>
+      </div>
+      <div style="margin-bottom:14px"><label class="lbl">タイトル</label><input id="cal-title" placeholder="内容を入力" value="${esc(S.calForm.title)}"></div>
+      <div style="display:flex;gap:8px"><button onclick="calSave()" class="btn-p" style="flex:1">保存</button><button onclick="set({calModal:false})" class="btn-s">キャンセル</button></div>
+    </div>
+  </div>`:''}
+  </div>`;
+}
+
+/* ===== MASTERS ===== */
+/* 【改修⑤】勤務設定から残業時間欄を削除 */
+function buildMasters(){
+  const ws=masters.workSettings;const dh=calcDailyH();const tab=S.masterTab;
+  const stars=(n,max=5)=>'★'.repeat(Math.max(0,Math.min(n,max)))+'☆'.repeat(Math.max(0,max-Math.min(n,max)));
+  const workerModal=S.wModal&&S.wForm?`<div style="position:fixed;inset:0;background:#000a;z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto">
+    <div style="background:#1e293b;border:1px solid #334155;border-radius:14px;padding:18px;width:100%;max-width:500px;margin-top:10px">
+      <p style="color:#e2e8f0;font-weight:800;font-size:14px;margin-bottom:14px">👷 作業員情報</p>
+      <div class="g2" style="margin-bottom:10px">
+        <div><label class="lbl">名前</label><input id="wf-name" value="${esc(S.wForm.name)}" placeholder="山田 太郎"></div>
+        <div><label class="lbl">役職</label><select id="wf-role">${ROLES.map(r=>`<option value="${r}" ${S.wForm.role===r?'selected':''}>${r}</option>`).join('')}</select></div>
+        <div><label class="lbl">班</label><select id="wf-team"><option value="" ${!S.wForm.team?'selected':''}>なし</option>${TEAMS.map(t=>`<option value="${t}" ${S.wForm.team===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div><label class="lbl">メイン機械</label><select id="wf-main"><option value="">未設定</option>${masters.machines.map(m=>`<option value="${m.id}" ${S.wForm.mainMachineId==m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select></div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label class="lbl">扱える機械・工程</label>
+          <button onclick="addWorkerSkill()" class="btn-xs">＋ 追加</button>
+        </div>
+        ${(S.wForm.skills||[]).length===0?`<p style="color:#334155;font-size:11px">まだ登録されていません</p>`:''}
+        ${(S.wForm.skills||[]).map((sk,idx)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:7px;background:#0d1117;border-radius:7px;padding:7px 10px;border:1px solid #21262d">
+          <select class="sk-machine" data-idx="${idx}" style="flex:2"><option value="">選択</option>${masters.machines.map(m=>`<option value="${m.id}" ${sk.machineId==m.id?'selected':''}>${esc(m.name)}</option>`).join('')}</select>
+          <select class="sk-level" data-idx="${idx}" style="flex:1">${[1,2,3,4,5].map(lv=>`<option value="${lv}" ${sk.level==lv?'selected':''}>★${lv}</option>`).join('')}</select>
+          <button onclick="removeWorkerSkill(${idx})" class="btn-xs" style="color:#f87171;border-color:#ef444440">✕</button>
+        </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveWorker()" class="btn-p" style="flex:1">保存</button>
+        <button onclick="closeWorkerModal()" class="btn-s">キャンセル</button>
+        ${masters.workers.find(w=>w.id==S.wForm.id)?`<button onclick="delWorker(${S.wForm.id})" class="btn-d">🗑</button>`:''}
+      </div>
+    </div>
+  </div>`:'';
+  const workersByTeam=()=>{
+    const shokucho=masters.workers.filter(w=>w.role==='職長');const groups=[];
+    if(shokucho.length)groups.push({label:'🏭 職長',color:'#f59e0b',workers:shokucho});
+    TEAMS.forEach(team=>{const tw=masters.workers.filter(w=>w.team===team);if(tw.length>0)groups.push({label:team,color:TEAM_COLORS[team],workers:tw});});
+    const unassigned=masters.workers.filter(w=>!w.team&&w.role!=='職長');
+    if(unassigned.length)groups.push({label:'班未設定',color:'#334155',workers:unassigned});
+    return groups;
+  };
+  return`<div class="up">
+  <div class="hdr">
+    <div><div style="font-weight:900;color:#e2e8f0;font-size:14px">⚙️ マスター設定</div><div style="color:#6366f1;font-size:9px;letter-spacing:2px">MASTER SETTINGS</div></div>
+    <button id="lock-btn" style="background:none;font-size:18px;padding:4px">🔒</button>
+  </div>
+  <div class="wrap" style="max-width:680px">
+    <div style="display:flex;background:#161b22;border:1px solid #21262d;border-radius:9px;overflow:hidden;margin-bottom:14px;position:sticky;top:46px;z-index:50;box-shadow:0 4px 8px #000a">
+      ${[['workers','👷 作業員'],['machines','🔧 機械'],['worksettings','🕐 勤務']].map(([k,l])=>`<button onclick="set({masterTab:'${k}'})" style="flex:1;background:${tab===k?'linear-gradient(135deg,#4f46e5,#7c3aed)':'#161b22'};border:none;color:${tab===k?'#fff':'#64748b'};padding:10px 4px;font-weight:700;font-size:13px">${l}</button>`).join('')}
+    </div>
+    ${tab==='workers'?`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <p style="color:#818cf8;font-weight:700;font-size:12px;letter-spacing:1px">作業員一覧（造機工場）</p>
+      <button onclick="openWorkerEdit(0)" class="btn-p" style="padding:7px 14px;font-size:12px">＋ 追加</button>
+    </div>
+    ${masters.workers.length===0?`<p style="color:#475569;text-align:center;padding:20px">まだ登録されていません</p>`:''}
+    ${workersByTeam().map(g=>`<div style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+        <div style="width:3px;height:16px;background:${g.color};border-radius:2px"></div>
+        <span style="color:${g.color};font-weight:900;font-size:13px">${esc(g.label)}</span>
+        <div style="height:1px;flex:1;background:#21262d"></div>
+        <span style="color:#475569;font-size:11px">${g.workers.length}名</span>
+      </div>
+      ${g.workers.map(w=>{const mn=machineName(w.mainMachineId);return`<div style="background:#161b22;border:1px solid #21262d;border-radius:9px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:flex-start;gap:10px;border-left:3px solid ${g.color}">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+            <span style="color:#e2e8f0;font-weight:800;font-size:13px">${esc(w.name)}</span>
+            <span class="tag ${ROLE_CLS[w.role]||'role-worker'}" style="border-radius:5px;padding:2px 7px;font-size:10px">${esc(w.role)}</span>
+            ${mn?`<span style="color:#475569;font-size:11px">🔧${esc(mn)}</span>`:''}
+          </div>
+          ${(w.skills||[]).length>0?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${(w.skills||[]).map(sk=>{const mn2=(masters.machines.find(m=>m.id==sk.machineId)||{}).name||'';return mn2?`<span style="background:#0d1117;border:1px solid #21262d;border-radius:5px;padding:2px 7px;font-size:10px;color:#64748b">${esc(mn2)} <span style="color:#f59e0b">${stars(parseInt(sk.level)||1)}</span></span>`:''}).join('')}</div>`:''}
+        </div>
+        <button onclick="openWorkerEdit(${w.id})" class="btn-xs">✏️ 編集</button>
+      </div>`;}).join('')}
+    </div>`).join('')}`:''}
+    ${tab==='machines'?`
+    <p style="color:#818cf8;font-weight:700;font-size:12px;letter-spacing:1px;margin-bottom:10px">機械一覧</p>
+    ${masters.machines.length===0?`<p style="color:#475569;text-align:center;padding:20px">まだ登録されていません</p>`:''}
+    ${masters.machines.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#161b22;border:1px solid #21262d;border-radius:9px;margin-bottom:7px">
+      <div><span style="color:#e2e8f0;font-weight:700;font-size:13px">🔧 ${esc(m.name)}</span>${m.type?`<span style="color:#64748b;font-size:11px;margin-left:8px">${esc(m.type)}</span>`:''}</div>
+      <button class="btn-xs" onclick="delMachine(${m.id})">✕</button>
+    </div>`).join('')}
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <input id="nm-n" placeholder="機械名（旋盤#1 等）" style="flex:2;min-width:100px">
+      <input id="nm-t" placeholder="種別（旋盤・ドリル等）" style="flex:2;min-width:100px">
+      <button onclick="addMachine()" class="btn-p" style="padding:7px 14px;font-size:13px">追加</button>
+    </div>`:''}
+    ${tab==='worksettings'?`
+    <p style="color:#818cf8;font-weight:700;font-size:12px;letter-spacing:1px;margin-bottom:12px">基本勤務時間</p>
+    <div class="g2" style="margin-bottom:10px">
+      <div><label class="lbl">勤務開始</label><input id="ws-s" type="time" value="${ws.startTime}"></div>
+      <div><label class="lbl">勤務終了</label><input id="ws-e" type="time" value="${ws.endTime}"></div>
+    </div>
+    <label class="lbl" style="margin-bottom:8px">休憩時間</label>
+    ${(ws.breaks||[]).map(b=>`<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <input id="br-s-${b.id}" type="time" value="${b.start}" style="flex:1">
+      <span style="color:#475569">〜</span>
+      <input id="br-e-${b.id}" type="time" value="${b.end}" style="flex:1">
+      <button class="btn-xs" onclick="delBreak(${b.id})">✕</button>
+    </div>`).join('')}
+    <button class="btn-xs" onclick="addBreak()" style="margin-bottom:12px">＋ 休憩を追加</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#0d1117;border-radius:8px;margin-bottom:12px">
+      <span style="color:#64748b;font-size:13px">実稼働時間（基本）</span>
+      <span style="color:#10b981;font-weight:900;font-size:16px">${dh.toFixed(1)}h / 日</span>
+    </div>
+    <p style="color:#64748b;font-size:11px;margin-bottom:10px">※ 残業時間は日報画面で日ごとに記録します</p>
+    <button onclick="saveWS()" class="btn-p" style="width:100%">保存</button>`:''}
+  </div>
+  ${workerModal}
+  </div>`;
+}
+
+/* ===== EVENT BINDING ===== */
+function bindEvents(){
+  try{
+    const $=id=>document.getElementById(id);
+    const on=(id,ev,fn)=>{const el=$(id);if(el)el.addEventListener(ev,fn);};
+    on('pw-inp','input',e=>{S.pw=e.target.value;});
+    on('pw-inp','keydown',e=>{if(e.key==='Enter')tryLogin();});
+    on('login-btn','click',tryLogin);
+    on('back-btn','click',()=>set({view:'list'}));
+    on('lock-btn','click',()=>set({locked:true,pw:'',pwErr:false}));
+    on('new-btn','click',goNew);
+    on('new-btn2','click',goNew);
+    on('submit-btn','click',saveOrder);
+    on('del-btn','click',()=>{if(S.eid)delOrder(S.eid);});
+    on('edit-btn','click',()=>goEdit(orders.find(o=>o.id===S.eid)));
+    on('edit-btn2','click',()=>goEdit(orders.find(o=>o.id===S.eid)));
+    on('toggle-done','click',()=>set({showDone:!S.showDone}));
+    on('toggle-caution','click',()=>set({showCautionOnly:!S.showCautionOnly}));
+    on('search-inp','input',e=>set({q:e.target.value}));
+    on('daily-date','change',e=>set({dailyDate:e.target.value}));
+    /* 【指摘①】担当者別の残業時間入力 */
+    document.querySelectorAll('.worker-ot').forEach(el=>{
+      el.addEventListener('input',e=>{
+        const wid=e.target.dataset.wid;
+        updateDailyOvertime(wid,e.target.value);
+        /* 合計の表示を即時更新（再描画を避けてフォーカス維持） */
+        try{
+          const d=getDailyNotes(S.dailyDate);
+          const otMap=d.overtimeByWorker||{};
+          const totalOt=Object.values(otMap).reduce((s,v)=>s+(parseFloat(v)||0),0);
+          const wc=Object.keys(otMap).filter(k=>(parseFloat(otMap[k])||0)>0).length;
+          /* ヘッダーカードの合計表示を更新 */
+          const cards=document.querySelectorAll('.card');
+          cards.forEach(c=>{
+            const p=c.querySelector('p');
+            if(p&&p.textContent.includes('本日の稼働時間')){
+              const divs=c.querySelectorAll('div[style*="font-weight:900"]');
+              if(divs.length>=2){
+                divs[1].innerHTML=totalOt.toFixed(1)+'<span style="font-size:11px;color:#475569">h</span>';
+                if(divs[2])divs[2].innerHTML=totalOt.toFixed(1)+'<span style="font-size:11px">h</span>';
+              }
+              const wcDivs=c.querySelectorAll('div[style*="color:#64748b"][style*="font-size:10px"][style*="margin-top:2px"]');
+              if(wcDivs.length>=1)wcDivs[0].textContent=wc+'名';
+            }
+          });
+          /* 入力欄の枠線色を更新 */
+          const val=parseFloat(e.target.value)||0;
+          const parent=e.target.closest('div[style*="border"]');
+          if(parent)parent.style.borderColor=val>0?'#f59e0b60':'#21262d';
+        }catch(err){console.error('update totals error:',err);}
+      });
+      el.addEventListener('focus',e=>e.target.select());
+    });
+    on('cal-type','change',e=>{S.calForm={...S.calForm,type:e.target.value};});
+    on('cal-title','input',e=>{S.calForm={...S.calForm,title:e.target.value};});
+    document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>set({groupBy:btn.dataset.group})));
+    document.querySelectorAll('.order-row').forEach(row=>row.addEventListener('click',()=>set({view:'detail',eid:parseInt(row.dataset.id)})));
+    document.querySelectorAll('.f-inp').forEach(el=>{
+      el.addEventListener('input',e=>{S.form={...S.form,[e.target.dataset.key]:e.target.value};});
+      el.addEventListener('focus',e=>{if(e.target.type==='number')e.target.select();});
+    });
+    document.querySelectorAll('.step-inp').forEach(el=>{
+      el.addEventListener('input',e=>{
+        const gk=e.target.dataset.gk;const idx=parseInt(e.target.dataset.idx);const field=e.target.dataset.field;
+        const steps=[...(S.form[gk]||[])];steps[idx]={...steps[idx],[field]:e.target.value};
+        S.form={...S.form,[gk]:steps};
+      });
+      el.addEventListener('change',e=>{
+        const gk=e.target.dataset.gk;const idx=parseInt(e.target.dataset.idx);const field=e.target.dataset.field;
+        const steps=[...(S.form[gk]||[])];steps[idx]={...steps[idx],[field]:e.target.value};
+        S.form={...S.form,[gk]:steps};
+      });
+      el.addEventListener('focus',e=>{if(e.target.type==='number')e.target.select();});
+    });
+    /* 【指摘C修正】日付プルダウンの変更をS.formに即座に反映 */
+    document.querySelectorAll('.date-sel').forEach(sel=>{
+      sel.addEventListener('change',e=>{
+        const prefix=e.target.dataset.prefix;
+        const formKey=e.target.dataset.formkey;
+        if(!prefix||!formKey)return;
+        const val=getDateVal(prefix);
+        /* 全フィールド選択済みになって初めてS.formに入れる */
+        S.form={...S.form,[formKey]:val||''};
+      });
+    });
+    document.querySelectorAll('[data-toggle]').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const k=btn.dataset.toggle;const v=btn.dataset.val==='true';
+        S.form={...S.form,[k]:!v};render();
+      });
+    });
+    document.querySelectorAll('.step-prog').forEach(inp=>{
+      inp.addEventListener('input',e=>{
+        const oid=parseInt(e.target.dataset.oid);
+        const gk=e.target.dataset.gk;
+        const sid=parseInt(e.target.dataset.sid);
+        updStepDone(oid,gk,sid,e.target.value);
+      });
+      inp.addEventListener('focus',e=>e.target.select());
+    });
+    document.querySelectorAll('.step-actual').forEach(inp=>{
+      inp.addEventListener('input',e=>{
+        const oid=parseInt(e.target.dataset.oid);
+        const gk=e.target.dataset.gk;
+        const sid=parseInt(e.target.dataset.sid);
+        updStepActual(oid,gk,sid,e.target.value);
+      });
+      inp.addEventListener('focus',e=>e.target.select());
+    });
+    document.querySelectorAll('.storage-inp').forEach(el=>{
+      el.addEventListener('input',e=>{
+        const place=e.target.dataset.place;
+        const val=parseInt(e.target.value)||0;
+        S.form={...S.form,storageQty:{...(S.form.storageQty||{}),[place]:val}};
+      });
+      el.addEventListener('focus',e=>e.target.select());
+    });
+    /* 【指摘⑤】置き場×ボタン（編集画面）: 値を0にクリア */
+    document.querySelectorAll('.storage-del-form').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        e.preventDefault();
+        const place=btn.dataset.place;
+        if(!place)return;
+        /* 入力欄を0にする */
+        const inp=document.querySelector(`.storage-inp[data-place="${place}"]`);
+        if(inp)inp.value='';
+        /* S.form を更新 */
+        const sq={...(S.form.storageQty||{})};
+        delete sq[place];
+        S.form={...S.form,storageQty:sq};
+        render();
+      });
+    });
+    /* 【指摘⑤】置き場×ボタン（詳細画面）: 即削除＆保存 */
+    document.querySelectorAll('.storage-del-detail').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        e.preventDefault();
+        const oid=parseInt(btn.dataset.oid);
+        const place=btn.dataset.place;
+        if(!oid||!place)return;
+        if(!confirm(`「${place}」の置き場在庫を削除しますか？`))return;
+        orders=orders.map(o=>{
+          if(o.id!==oid)return o;
+          const sq={...(o.storageQty||{})};
+          delete sq[place];
+          return{...o,storageQty:sq};
+        });
+        persist();render();
+      });
+    });
+    if(S.wModal&&S.wForm){
+      ['wf-name','wf-role','wf-team','wf-main'].forEach(id=>{
+        const map={'wf-name':'name','wf-role':'role','wf-team':'team','wf-main':'mainMachineId'};
+        on(id,'change',e=>{S.wForm={...S.wForm,[map[id]]:e.target.value};});
+        on(id,'input',e=>{S.wForm={...S.wForm,[map[id]]:e.target.value};});
+      });
+      document.querySelectorAll('.sk-machine').forEach(el=>{el.addEventListener('change',e=>{const idx=parseInt(e.target.dataset.idx);const sk=[...(S.wForm.skills||[])];sk[idx]={...sk[idx],machineId:e.target.value};S.wForm={...S.wForm,skills:sk};});});
+      document.querySelectorAll('.sk-level').forEach(el=>{el.addEventListener('change',e=>{const idx=parseInt(e.target.dataset.idx);const sk=[...(S.wForm.skills||[])];sk[idx]={...sk[idx],level:parseInt(e.target.value)};S.wForm={...S.wForm,skills:sk};});});
+    }
+    document.querySelectorAll('[id^="memo-"]').forEach(el=>{
+      el.addEventListener('input',e=>{
+        const id=parseInt(e.target.id.replace('memo-',''));
+        const d=getDailyNotes(S.dailyDate);
+        d.meetings=(d.meetings||[]).map(m=>m.id==id?{...m,text:e.target.value}:m);
+        saveDailyNotes(S.dailyDate,d);
+      });
+    });
+    const atb=$('alarm-toggle-btn');
+    if(atb)atb.textContent=alarmEnabled?'アラームOFF':'アラームON';
+  }catch(e){console.error('bindEvents error:',e);}
+}
+
+function tryLogin(){if(S.pw===PASS){set({locked:false,pwErr:false});}else{set({pwErr:true,pw:''});}}
+
+/* ===== APP INIT ===== */
+(async()=>{
+  document.getElementById('app').innerHTML=
+    '<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:14px">' +
+    '<div style="font-size:32px;animation:spin 2s linear infinite">⚙️</div>' +
+    '<div style="color:#818cf8;font-size:14px;font-weight:700;letter-spacing:2px">読み込み中...</div>' +
+    '</div>';
+  try{
+    const[o,m,t,c,dn]=await Promise.all([
+      apiGet(SK),apiGet(MK),apiGet(TK),apiGet(CK),
+      apiGet(DK+'_'+S.dailyDate)
+    ]);
+    if(m&&typeof m==='object'){
+      /* 古い overtime フィールドは無視 */
+      if(m.workSettings&&'overtime' in m.workSettings)delete m.workSettings.overtime;
+      /* 既存データに12:00-12:45の休憩が無ければ自動追加 */
+      if(m.workSettings)m.workSettings=migrateBreaks(m.workSettings);
+      masters=m;
+      /* マイグレーションが発生したら自動保存 */
+      saveMasters();
+    }
+    if(t)timeDB=t;
+    if(Array.isArray(o))orders=o.map(migrate);
+    if(Array.isArray(c))calEvents=c;
+    _dc[S.dailyDate]=dn||{meetings:[],overtimeByWorker:{}};
+  }catch(e){console.error('[init] error:',e);}
+  loadAlarmSetting();
+  render();
+  checkAlarm();
+  startAlarmTimer();
+})();
+</script>
+</body>
+</html>
