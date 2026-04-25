@@ -3,13 +3,13 @@
 ================================================================
  工程管理アプリ Python+Excel版 バックエンドサーバー
 ================================================================
-
+ 
  役割: ブラウザから来たデータをExcelに書き、Excelから読んでブラウザに返す
  構成: Flask (Webサーバー) + openpyxl (Excel読み書き)
  起動: python app.py
  
  データファイル: factory_data.xlsx (このファイルと同じフォルダに自動生成)
-
+ 
  APIエンドポイント:
    GET  /                     → index.htmlを返す (画面表示)
    GET  /api/data/<key>       → 指定キーのデータをExcelから取得
@@ -20,7 +20,7 @@
  【重要】 全てのAPIでエラーハンドリング実装済み
 ================================================================
 """
-
+ 
 import os
 import json
 import threading
@@ -28,31 +28,31 @@ import datetime
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, abort
 from openpyxl import Workbook, load_workbook
-
+ 
 # ============================================================
 # 基本設定
 # ============================================================
-
+ 
 # このファイルが置かれているフォルダのパス
 BASE_DIR = Path(__file__).resolve().parent
 # Excelデータファイルのパス
 DATA_FILE = BASE_DIR / 'factory_data.xlsx'
 # フロントエンドのHTMLが置かれているフォルダ
 STATIC_DIR = BASE_DIR / 'static'
-
+ 
 # Excelファイルの排他ロック（複数のリクエストが同時に書き込むと破損するため）
 FILE_LOCK = threading.Lock()
-
+ 
 # Flaskアプリ作成
 app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path='')
-
-
+ 
+ 
 # ============================================================
 # シート定義
 # ============================================================
 # 各シート名とその列構成を定義
 # 新しいシートを追加する場合はここに追加する
-
+ 
 SHEETS = {
     # 受注一覧（顧客・製番・納期など）
     '受注一覧': [
@@ -66,9 +66,11 @@ SHEETS = {
         'createdAt'
     ],
     # 工程明細（各受注の工程ステップ）
+    # machineId: カンマ区切りで複数IDを保持可能（例: "1,2,3"）
+    # hoursPerUnitUnit: 'h' または '日' （表示時の単位復元用）
     '工程明細': [
         'orderId', 'groupKey', 'stepIndex',
-        'name', 'machineId', 'machineCount', 'hoursPerUnit',
+        'name', 'machineId', 'machineCount', 'hoursPerUnit', 'hoursPerUnitUnit',
         'done', 'actualHours',
         'scheduleOrder', 'scheduleStart', 'scheduleOperator'
     ],
@@ -107,7 +109,7 @@ SHEETS = {
         'id', 'date', 'title', 'type', 'color'
     ],
 }
-
+ 
 # フロントエンドのキーとExcelシートの対応表
 # 既存フロントは「キー単位」でデータを取得するため、ここでシート⇔キーを変換
 KEY_TO_SHEET = {
@@ -118,12 +120,12 @@ KEY_TO_SHEET = {
     'factory_products_v1': '製品マスタ',  # 製品マスタ
     'factory_product_machines_v1': '製品機械',  # 製品×機械
 }
-
-
+ 
+ 
 # ============================================================
 # Excel初期化
 # ============================================================
-
+ 
 def init_excel():
     """
     初回起動時にExcelファイルを作成する。
@@ -151,7 +153,7 @@ def init_excel():
         wb.close()
         print(f'[init] Excelファイルを新規作成しました: {DATA_FILE}')
         return
-
+ 
     # 既存ファイルがある場合は不足シートを追加
     try:
         wb = load_workbook(str(DATA_FILE))
@@ -168,12 +170,12 @@ def init_excel():
     except Exception as e:
         print(f'[init] エラー: {e}')
         raise
-
-
+ 
+ 
 # ============================================================
 # Excel読み書きヘルパー
 # ============================================================
-
+ 
 def read_sheet(sheet_name):
     """
     指定シートを全行読み込んで辞書のリストで返す。
@@ -181,7 +183,7 @@ def read_sheet(sheet_name):
     """
     if not DATA_FILE.exists():
         init_excel()
-
+ 
     with FILE_LOCK:
         try:
             wb = load_workbook(str(DATA_FILE), read_only=True, data_only=True)
@@ -217,8 +219,8 @@ def read_sheet(sheet_name):
         except Exception as e:
             print(f'[read_sheet] エラー ({sheet_name}): {e}')
             return []
-
-
+ 
+ 
 def write_sheet(sheet_name, records):
     """
     指定シートを丸ごと書き換える。
@@ -226,7 +228,7 @@ def write_sheet(sheet_name, records):
     """
     if not DATA_FILE.exists():
         init_excel()
-
+ 
     with FILE_LOCK:
         try:
             wb = load_workbook(str(DATA_FILE))
@@ -265,21 +267,21 @@ def write_sheet(sheet_name, records):
         except Exception as e:
             print(f'[write_sheet] エラー ({sheet_name}): {e}')
             return False
-
-
+ 
+ 
 # ============================================================
 # メモリキャッシュ（Excelを使わない一時データ）
 # ============================================================
-
+ 
 # 日報メモは日付ごとにシート分けせず、全日付を1シートに保存
 # メモリキャッシュで高速化
 _memory_cache = {}
-
-
+ 
+ 
 # ============================================================
 # 統合データ取得（既存フロント互換）
 # ============================================================
-
+ 
 def get_orders():
     """
     受注データを取得する。
@@ -288,7 +290,7 @@ def get_orders():
     orders = read_sheet('受注一覧')
     steps_all = read_sheet('工程明細')
     storages_all = read_sheet('置き場在庫')
-
+ 
     result = []
     for o in orders:
         order_id = o.get('id')
@@ -297,7 +299,7 @@ def get_orders():
             oid_int = int(order_id) if order_id is not None else None
         except (ValueError, TypeError):
             oid_int = None
-
+ 
         # 該当の工程明細を取得
         group1 = []
         group2 = []
@@ -315,6 +317,7 @@ def get_orders():
                 'operatorId': '',  # 旧互換用
                 'machineCount': int(s.get('machineCount') or 1),
                 'hoursPerUnit': s.get('hoursPerUnit') or '',
+                'hoursPerUnitUnit': s.get('hoursPerUnitUnit') or 'h',
                 'done': int(s.get('done') or 0),
                 'actualHours': s.get('actualHours') or '',
                 'scheduleOrder': s.get('scheduleOrder'),
@@ -328,7 +331,7 @@ def get_orders():
         # 順序でソート
         group1.sort(key=lambda x: x['id'])
         group2.sort(key=lambda x: x['id'])
-
+ 
         # 置き場在庫
         storage_qty = {}
         for st in storages_all:
@@ -341,7 +344,7 @@ def get_orders():
                 qty = int(st.get('qty') or 0)
                 if place:
                     storage_qty[place] = qty
-
+ 
         # 元の受注データをコピー
         order_data = dict(o)
         order_data['group1'] = group1 if group1 else []
@@ -352,10 +355,10 @@ def get_orders():
             v = order_data.get(bk)
             order_data[bk] = v in (True, 'TRUE', 'true', 'True', 1, '1')
         result.append(order_data)
-
+ 
     return result
-
-
+ 
+ 
 def save_orders(orders):
     """
     受注データを保存する。
@@ -364,7 +367,7 @@ def save_orders(orders):
     order_records = []
     step_records = []
     storage_records = []
-
+ 
     for o in orders:
         if not isinstance(o, dict):
             continue
@@ -392,7 +395,7 @@ def save_orders(orders):
             'createdAt': o.get('at') or o.get('createdAt') or '',
         }
         order_records.append(order_rec)
-
+ 
         # 工程明細
         for gk in ['group1', 'group2']:
             steps = o.get(gk) or []
@@ -407,6 +410,7 @@ def save_orders(orders):
                     'machineId': s.get('machineId') or '',
                     'machineCount': s.get('machineCount') or 1,
                     'hoursPerUnit': s.get('hoursPerUnit') or '',
+                    'hoursPerUnitUnit': s.get('hoursPerUnitUnit') or 'h',
                     'done': s.get('done') or 0,
                     'actualHours': s.get('actualHours') or '',
                     'scheduleOrder': s.get('scheduleOrder'),
@@ -414,7 +418,7 @@ def save_orders(orders):
                     'scheduleOperator': s.get('scheduleOperator') or '',
                 }
                 step_records.append(step_rec)
-
+ 
         # 置き場在庫
         storage_qty = o.get('storageQty') or {}
         if isinstance(storage_qty, dict):
@@ -425,14 +429,14 @@ def save_orders(orders):
                         'place': place,
                         'qty': int(qty)
                     })
-
+ 
     # 3シート全更新
     ok1 = write_sheet('受注一覧', order_records)
     ok2 = write_sheet('工程明細', step_records)
     ok3 = write_sheet('置き場在庫', storage_records)
     return ok1 and ok2 and ok3
-
-
+ 
+ 
 def get_masters():
     """
     マスタ類をまとめて取得する（既存フロント互換）
@@ -440,7 +444,7 @@ def get_masters():
     workers = read_sheet('作業者マスタ')
     machines = read_sheet('機械マスタ')
     work_settings_rows = read_sheet('勤務設定')
-
+ 
     # 勤務設定をdict化
     ws_dict = {
         'startTime': '08:00',
@@ -460,7 +464,7 @@ def get_masters():
                 pass
         elif k in ('startTime', 'endTime'):
             ws_dict[k] = v or ws_dict[k]
-
+ 
     # workersのskillsをJSON→listに変換
     normalized_workers = []
     for w in workers:
@@ -474,42 +478,42 @@ def get_masters():
         elif not skills:
             wd['skills'] = []
         normalized_workers.append(wd)
-
+ 
     return {
         'workers': normalized_workers,
         'machines': machines,
         'workSettings': ws_dict,
     }
-
-
+ 
+ 
 def save_masters(data):
     """
     マスタ類をまとめて保存する
     """
     if not isinstance(data, dict):
         return False
-
+ 
     workers = data.get('workers') or []
     machines = data.get('machines') or []
     ws = data.get('workSettings') or {}
-
+ 
     # 勤務設定をkey-value形式に変換
     ws_rows = [
         {'key': 'startTime', 'value': ws.get('startTime', '08:00')},
         {'key': 'endTime', 'value': ws.get('endTime', '17:00')},
         {'key': 'breaks', 'value': json.dumps(ws.get('breaks', []), ensure_ascii=False)},
     ]
-
+ 
     ok1 = write_sheet('作業者マスタ', workers)
     ok2 = write_sheet('機械マスタ', machines)
     ok3 = write_sheet('勤務設定', ws_rows)
     return ok1 and ok2 and ok3
-
-
+ 
+ 
 # ============================================================
 # APIエンドポイント
 # ============================================================
-
+ 
 @app.route('/')
 def index():
     """トップページ（index.htmlを返す）"""
@@ -522,8 +526,8 @@ def index():
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     return response
-
-
+ 
+ 
 @app.route('/api/data/<path:key>', methods=['GET'])
 def api_get(key):
     """データ取得API"""
@@ -564,44 +568,44 @@ def api_get(key):
                 'meetings': formatted,
                 'overtimeByWorker': overtime_by_worker
             }})
-
+ 
         # 受注
         if key == 'factory_py_v1':
             orders = get_orders()
             return jsonify({'ok': True, 'value': orders})
-
+ 
         # マスタ
         if key == 'factory_masters_v1':
             masters = get_masters()
             return jsonify({'ok': True, 'value': masters})
-
+ 
         # カレンダー
         if key == 'factory_cal_v1':
             events = read_sheet('カレンダー')
             return jsonify({'ok': True, 'value': events})
-
+ 
         # 製品マスタ
         if key == 'factory_products_v1':
             products = read_sheet('製品マスタ')
             return jsonify({'ok': True, 'value': products})
-
+ 
         # 製品×機械マスタ
         if key == 'factory_product_machines_v1':
             pm = read_sheet('製品機械')
             return jsonify({'ok': True, 'value': pm})
-
+ 
         # 工数ヒント（メモリ保持）
         if key == 'factory_time_v1':
             return jsonify({'ok': True, 'value': _memory_cache.get(key, {})})
-
+ 
         # 未知のキー
         return jsonify({'ok': True, 'value': None})
-
+ 
     except Exception as e:
         print(f'[api_get] エラー ({key}): {e}')
         return jsonify({'ok': False, 'error': str(e)}), 500
-
-
+ 
+ 
 @app.route('/api/data/<path:key>', methods=['POST'])
 def api_post(key):
     """データ保存API"""
@@ -610,7 +614,7 @@ def api_post(key):
         if body is None:
             return jsonify({'ok': False, 'error': 'JSONボディが必要'}), 400
         value = body.get('value')
-
+ 
         # 日報メモ
         if key.startswith('factory_daily_v1_'):
             date = key.replace('factory_daily_v1_', '')
@@ -653,74 +657,74 @@ def api_post(key):
                         })
             ok = write_sheet('日報メモ', all_daily)
             return jsonify({'ok': ok})
-
+ 
         # 受注
         if key == 'factory_py_v1':
             if not isinstance(value, list):
                 return jsonify({'ok': False, 'error': '配列が必要'}), 400
             ok = save_orders(value)
             return jsonify({'ok': ok})
-
+ 
         # マスタ
         if key == 'factory_masters_v1':
             ok = save_masters(value)
             return jsonify({'ok': ok})
-
+ 
         # カレンダー
         if key == 'factory_cal_v1':
             if not isinstance(value, list):
                 return jsonify({'ok': False, 'error': '配列が必要'}), 400
             ok = write_sheet('カレンダー', value)
             return jsonify({'ok': ok})
-
+ 
         # 製品マスタ
         if key == 'factory_products_v1':
             if not isinstance(value, list):
                 return jsonify({'ok': False, 'error': '配列が必要'}), 400
             ok = write_sheet('製品マスタ', value)
             return jsonify({'ok': ok})
-
+ 
         # 製品×機械マスタ
         if key == 'factory_product_machines_v1':
             if not isinstance(value, list):
                 return jsonify({'ok': False, 'error': '配列が必要'}), 400
             ok = write_sheet('製品機械', value)
             return jsonify({'ok': ok})
-
+ 
         # 工数ヒント（メモリ）
         if key == 'factory_time_v1':
             _memory_cache[key] = value or {}
             return jsonify({'ok': True})
-
+ 
         # 未知のキー
         return jsonify({'ok': False, 'error': f'未知のキー: {key}'}), 400
-
+ 
     except Exception as e:
         print(f'[api_post] エラー ({key}): {e}')
         return jsonify({'ok': False, 'error': str(e)}), 500
-
-
+ 
+ 
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({'ok': False, 'error': 'Not Found'}), 404
-
-
+ 
+ 
 @app.errorhandler(500)
 def server_error(e):
     return jsonify({'ok': False, 'error': 'Internal Server Error'}), 500
-
-
+ 
+ 
 # ============================================================
 # サーバー起動
 # ============================================================
-
+ 
 if __name__ == '__main__':
     print('=' * 60)
     print(' 工程管理アプリ Python+Excel版 サーバー起動')
     print('=' * 60)
     print(f' データファイル: {DATA_FILE}')
     print(f' 静的ファイル: {STATIC_DIR}')
-
+ 
     # Excelファイルを初期化
     try:
         init_excel()
@@ -728,15 +732,13 @@ if __name__ == '__main__':
     except Exception as e:
         print(f' Excelファイル初期化エラー: {e}')
         raise SystemExit(1)
-
+ 
     print('=' * 60)
     print(' ブラウザで http://localhost:5000 にアクセス')
     print(' 他のPC/スマホからは http://<このPCのIP>:5000')
     print(' 停止するには Ctrl+C を押してください')
     print('=' * 60)
-
+ 
     # 0.0.0.0 = LAN内の他の機器からもアクセス可能にする
     # debug=False = 本番運用モード（エラー詳細を外部に見せない）
-    # Railway等のクラウドではPORT環境変数が指定される
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)
