@@ -118,7 +118,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
      ⑧ 保守値を目立たせる表示
    ============================================================ */
 
-const PASS='1122';
+const PASS='1234';
 const SK='factory_py_v1', MK='factory_masters_v1', TK='factory_time_v1', DK='factory_daily_v1', CK='factory_cal_v1';
 const ALARM_KEY='factory_alarm_setting', ALARM_DISMISS_KEY='factory_alarm_dismiss';
 const TEAMS=['1班','2班','3班'];
@@ -241,9 +241,20 @@ async function apiGet(key){
   try{const r=await fetch('/api/data/'+encodeURIComponent(key));if(!r.ok)return null;const d=await r.json();return d.ok?d.value:null;}
   catch(e){console.error('[apiGet]',key,e);return null;}
 }
+/* 【バグ修正】Promise返却＋keepaliveでページ離脱中でも完走させる */
 function apiSet(key,value){
-  try{fetch('/api/data/'+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value})}).catch(e=>console.error('[apiSet]',key,e));}
-  catch(e){console.error('[apiSet] sync error:',e);}
+  try{
+    return fetch('/api/data/'+encodeURIComponent(key),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({value}),
+      keepalive:true
+    }).then(r=>{
+      if(!r.ok){console.error('[apiSet] HTTP error:',key,r.status);return false;}
+      return r.json().then(d=>d.ok===true).catch(()=>false);
+    }).catch(e=>{console.error('[apiSet] network error:',key,e);return false;});
+  }
+  catch(e){console.error('[apiSet] sync error:',e);return Promise.resolve(false);}
 }
 
 /* ===== MASTERS ===== */
@@ -289,7 +300,31 @@ let timeDB={};
 const saveTDB=()=>apiSet(TK,timeDB);
 
 /* ===== ORDERS ===== */
-const defStep=name=>({id:uid(),name:name||'加工',machineId:'',operatorId:'',machineCount:1,hoursPerUnit:'',done:0,actualHours:''});
+/* 【改修③】machineId（カンマ区切り文字列）→ machineIds（配列）相互変換ヘルパー */
+const parseMachineIds=v=>{
+  if(Array.isArray(v))return v.map(x=>String(x)).filter(x=>x);
+  if(v==null||v==='')return [];
+  return String(v).split(',').map(x=>x.trim()).filter(x=>x);
+};
+const stringifyMachineIds=arr=>{
+  if(!Array.isArray(arr))return arr||'';
+  return arr.filter(x=>x).join(',');
+};
+/* 機械IDの配列から機械名を結合して返す */
+const machineNamesFromIds=ids=>{
+  const arr=parseMachineIds(ids);
+  return arr.map(id=>machineName(id)).filter(n=>n).join('・');
+};
+/* 機械種別の一覧を取得（重複排除） */
+const machineTypes=()=>{
+  const types=new Set();
+  (masters.machines||[]).forEach(m=>{if(m.type)types.add(m.type);});
+  return Array.from(types).sort();
+};
+/* 【改修④】時間/個プルダウン用の選択肢 */
+const HPU_VALUES=[0.1,0.25,0.5,0.75,1,1.5,2,3,4,5,6,8,10,12,16,24];
+/* 【改修③④】defStep: machineId→空文字（カンマ区切り）, hoursPerUnitUnit追加 */
+const defStep=name=>({id:uid(),name:name||'加工',machineId:'',operatorId:'',machineCount:1,hoursPerUnit:'',hoursPerUnitUnit:'h',done:0,actualHours:''});
 
 const blankOrder=()=>({
   id:uid(),seiban:'',client:'',product:'',productId:'',material:'',qty:'',
@@ -320,20 +355,44 @@ const migrate=o=>{
   if(!base.storageQty||typeof base.storageQty!=='object')base.storageQty={};
   if(base.product===undefined)base.product='';
   if(base.productId===undefined)base.productId='';
+  /* 【改修③④】各工程に対して machineId（複数値文字列化）と hoursPerUnitUnit を補完 */
+  const fixSteps=arr=>(arr||[]).map(s=>{
+    const o2={...s};
+    /* machineIdを文字列形式に統一 */
+    if(Array.isArray(o2.machineId))o2.machineId=stringifyMachineIds(o2.machineId);
+    else if(o2.machineId==null)o2.machineId='';
+    else o2.machineId=String(o2.machineId);
+    /* 単位デフォルトはh */
+    if(!o2.hoursPerUnitUnit)o2.hoursPerUnitUnit='h';
+    /* UI状態フィールドが残っていれば除去 */
+    delete o2._filterTypes;
+    return o2;
+  });
+  base.group1=fixSteps(base.group1);
+  base.group2=fixSteps(base.group2);
   return base;
 };
 
 let orders=[];
 const persist=()=>apiSet(SK,orders);
 
+/* 【改修④】時間/個（h or 日）→ h単位に変換 */
+const hpuToHours=s=>{
+  const v=parseFloat(s.hoursPerUnit);
+  if(isNaN(v)||v<=0)return 0;
+  const u=s.hoursPerUnitUnit||'h';
+  if(u==='日'){
+    const dh=calcDailyH()||8;
+    return v*dh;
+  }
+  return v;
+};
+
 /* 【改修①】加工②が実質的に空かどうかを判定する関数（hoursPerUnitが全部空） */
 const hasGroup2=o=>{
   const g2=o.group2||[];
   if(!g2.length)return false;
-  return g2.some(s=>{
-    const h=parseFloat(s.hoursPerUnit);
-    return !isNaN(h)&&h>0;
-  });
+  return g2.some(s=>hpuToHours(s)>0);
 };
 
 /* 完了判定 */
@@ -359,7 +418,7 @@ const overallRatio=o=>{
 /* 工程の残り時間（時間単位） */
 const stepRemainH=(s,qty)=>{
   const rem=Math.max(0,qty-(parseInt(s.done)||0));
-  const hpu=parseFloat(s.hoursPerUnit)||0;
+  const hpu=hpuToHours(s);
   const mc=Math.max(1,parseInt(s.machineCount)||1);
   return rem*hpu/mc;
 };
@@ -379,17 +438,14 @@ const waitH=(o,dh)=>{
   return h;
 };
 
-/* 【改修②】計算ロジック
-   楽観値: G1順次合計 + 待ち + G2最後の工程の1個分 (G2があれば)
-   保守値: G1順次合計 + 待ち + G2全工程順次合計 (G2があれば)
-   G2がない場合: G1合計 + 待ち */
+/* 【改修②】計算ロジック */
 const calcOptimistic=(o,dh)=>{
   const q=parseInt(o.qty)||0;if(!q)return 0;
   const g1H=(o.group1||[]).reduce((s,st)=>s+stepRemainH(st,q),0);
   if(!hasGroup2(o))return g1H+waitH(o,dh);
   const g2=o.group2||[];
   const g2Last=g2[g2.length-1];
-  const hpu=parseFloat(g2Last?.hoursPerUnit)||0;
+  const hpu=hpuToHours(g2Last||{});
   const mc=Math.max(1,parseInt(g2Last?.machineCount)||1);
   const g2LastH=hpu/mc;
   return g1H+waitH(o,dh)+g2LastH;
@@ -600,6 +656,9 @@ let S={
   calForm:{title:'',type:'event'},
   masterTab:'workers',
   wModal:false,wForm:null,
+  /* 【改修⑥】ガントチャート(予定表) */
+  schTeam:'全班',schPeriod:30,schStart:todayStr(),schShowDone:false,
+  schBarModal:false,schBarRef:null,
 };
 const set=patch=>{
   try{
@@ -629,28 +688,48 @@ window.removeStepFromGroup=(gk,i)=>{
   steps.splice(i,1);
   S.form={...S.form,[gk]:steps};render();
 };
-window.addMachine=()=>{
+window.addMachine=async()=>{
   const ne=document.getElementById('nm-n'),te=document.getElementById('nm-t');
   const n=ne?ne.value.trim():'';const t=te?te.value.trim():'';
   if(!n)return;
   masters.machines=[...masters.machines,{id:uid(),name:n,type:t||''}];
-  saveMasters();render();
+  const ok=await saveMasters();
+  if(!ok)alert('⚠️ 保存に失敗しました。ネットワークを確認してください');
+  render();
 };
-window.delMachine=id=>{if(!confirm('削除しますか？'))return;masters.machines=masters.machines.filter(m=>m.id!=id);saveMasters();render();};
-window.addBreak=()=>{masters.workSettings.breaks=[...(masters.workSettings.breaks||[]),{id:uid(),start:'12:00',end:'13:00'}];saveMasters();render();};
-window.delBreak=id=>{masters.workSettings.breaks=(masters.workSettings.breaks||[]).filter(b=>b.id!=id);saveMasters();render();};
-window.saveWS=()=>{
+window.delMachine=async id=>{
+  if(!confirm('削除しますか？'))return;
+  masters.machines=masters.machines.filter(m=>m.id!=id);
+  const ok=await saveMasters();
+  if(!ok)alert('⚠️ 保存に失敗しました');
+  render();
+};
+window.addBreak=async()=>{
+  masters.workSettings.breaks=[...(masters.workSettings.breaks||[]),{id:uid(),start:'12:00',end:'13:00'}];
+  const ok=await saveMasters();
+  if(!ok)alert('⚠️ 保存に失敗しました');
+  render();
+};
+window.delBreak=async id=>{
+  masters.workSettings.breaks=(masters.workSettings.breaks||[]).filter(b=>b.id!=id);
+  const ok=await saveMasters();
+  if(!ok)alert('⚠️ 保存に失敗しました');
+  render();
+};
+window.saveWS=async()=>{
   try{
     const ws=masters.workSettings;
     const sEl=document.getElementById('ws-s');const eEl=document.getElementById('ws-e');
     ws.startTime=sEl?sEl.value:'08:00';
     ws.endTime=eEl?eEl.value:'17:00';
-    /* 【改修⑤】overtimeは保存しない */
     (ws.breaks||[]).forEach(b=>{
       const bs=document.getElementById(`br-s-${b.id}`);const be=document.getElementById(`br-e-${b.id}`);
       if(bs)b.start=bs.value;if(be)b.end=be.value;
     });
-    saveMasters();alert('✅ 保存しました');render();
+    const ok=await saveMasters();
+    if(ok)alert('✅ 保存しました');
+    else alert('⚠️ 保存に失敗しました。ネットワークを確認してください');
+    render();
   }catch(e){alert('保存エラー: '+e.message);}
 };
 window.openWorkerEdit=id=>{
@@ -659,14 +738,36 @@ window.openWorkerEdit=id=>{
   S.wModal=true;render();
 };
 window.closeWorkerModal=()=>{S.wModal=false;S.wForm=null;render();};
-window.saveWorker=()=>{
+/* 【バグ修正】保存完了を待ってからモーダル閉じる。失敗時はエラー表示 */
+window.saveWorker=async()=>{
   const f=S.wForm;if(!f||!f.name){alert('名前を入力してください');return;}
   const ex=masters.workers.find(w=>w.id==f.id);
   if(ex)masters.workers=masters.workers.map(w=>w.id==f.id?f:w);
   else masters.workers=[...masters.workers,f];
-  saveMasters();S.wModal=false;S.wForm=null;render();
+  const ok=await saveMasters();
+  if(!ok){
+    alert('⚠️ 保存に失敗しました。ネットワークを確認してください');
+    /* 失敗時はロールバック */
+    if(ex)masters.workers=masters.workers.map(w=>w.id==f.id?ex:w);
+    else masters.workers=masters.workers.filter(w=>w.id!=f.id);
+    render();
+    return;
+  }
+  S.wModal=false;S.wForm=null;render();
 };
-window.delWorker=id=>{if(!confirm('削除しますか？'))return;masters.workers=masters.workers.filter(w=>w.id!=id);saveMasters();S.wModal=false;S.wForm=null;render();};
+window.delWorker=async id=>{
+  if(!confirm('削除しますか？'))return;
+  const backup=masters.workers.find(w=>w.id==id);
+  masters.workers=masters.workers.filter(w=>w.id!=id);
+  const ok=await saveMasters();
+  if(!ok){
+    alert('⚠️ 削除に失敗しました');
+    if(backup)masters.workers=[...masters.workers,backup];
+    render();
+    return;
+  }
+  S.wModal=false;S.wForm=null;render();
+};
 window.addWorkerSkill=()=>{if(!S.wForm)return;S.wForm={...S.wForm,skills:[...(S.wForm.skills||[]),{id:uid(),machineId:'',level:3}]};render();};
 window.removeWorkerSkill=idx=>{const sk=[...(S.wForm.skills||[])];sk.splice(idx,1);S.wForm={...S.wForm,skills:sk};render();};
 
@@ -756,12 +857,31 @@ function saveOrder(){
       const v=parseInt(el.value)||0;
       if(place&&v>0)storageQty[place]=v;
     });
+    /* 【改修③④】工程の正規化:
+       - _filterTypes（UI状態）を除去
+       - 時間/個を h単位に正規化保存（hoursPerUnitUnit='日'なら × dailyH）
+       - machineCount を machineIds.length と整合させる */
+    const dailyH=calcDailyH()||8;
+    const normalizeStep=s=>{
+      const out={...s};
+      delete out._filterTypes;
+      const v=parseFloat(out.hoursPerUnit);
+      if(out.hoursPerUnitUnit==='日'&&!isNaN(v)){
+        /* 表示単位は'日'のままで保存。表示時に再変換するため、内部値もそのまま保持。
+           ただし、計算用にhoursPerUnit_h（h単位）を補助フィールドとして派生させる。
+           シンプル化のため：hoursPerUnitは常に「ユーザーが選んだ値」、unitで解釈する方針。
+           計算時にunitを参照してhに変換する。 */
+      }
+      out.machineCount=Math.max(parseMachineIds(out.machineId).length,parseInt(out.machineCount)||1);
+      out.done=Math.min(parseInt(out.done)||0,qty);
+      return out;
+    };
     const e={
       ...S.form,qty,deadline,inspectionDate,internalInspectionDate,
       heatTreatReturnDate,outsourceReturnDate,
       storageQty,
-      group1:(S.form.group1||[]).map(s=>({...s,done:Math.min(parseInt(s.done)||0,qty)})),
-      group2:(S.form.group2||[]).map(s=>({...s,done:Math.min(parseInt(s.done)||0,qty)})),
+      group1:(S.form.group1||[]).map(normalizeStep),
+      group2:(S.form.group2||[]).map(normalizeStep),
     };
     orders=S.eid?orders.map(o=>o.id===S.eid?e:o):[...orders,e];
     persist();checkAlarm();set({view:'list'});
@@ -802,16 +922,16 @@ function render(){
 }
 function buildHTML(){
   if(S.locked)return buildLock();
-  const views={list:buildList,form:buildForm,detail:buildDetail,masters:buildMasters,daily:buildDaily,calendar:buildCalendar};
+  const views={list:buildList,form:buildForm,detail:buildDetail,masters:buildMasters,daily:buildDaily,calendar:buildCalendar,schedule:buildSchedule};
   return (views[S.view]||buildList)()+buildBottomNav();
 }
 function buildBottomNav(){
   if(S.locked||S.view==='form')return'';
   const alarmIcon=alarmEnabled?'🔔':'🔕';
-  const tabs=[['list','📋','一覧'],['daily','👷','日報'],['calendar','🗓','カレンダー'],['masters','⚙️','設定']];
+  const tabs=[['list','📋','一覧'],['schedule','📅','予定表'],['daily','👷','日報'],['calendar','🗓','暦'],['masters','⚙️','設定']];
   return`<nav class="bnav">
     ${tabs.map(([v,ic,lb])=>`<button onclick="set({view:'${v}'})" class="${S.view===v?'active':''}"><span class="ico">${ic}</span>${lb}</button>`).join('')}
-    <button onclick="toggleAlarmSetting()" title="アラーム設定"><span class="ico">${alarmIcon}</span>アラーム</button>
+    <button onclick="toggleAlarmSetting()" title="アラーム設定"><span class="ico">${alarmIcon}</span></button>
   </nav>`;
 }
 
@@ -850,7 +970,7 @@ function buildList(){
     if(tf!=='全班'){const teams=getOrderTeams(o);if(!teams.has(tf))return false;}
     if(S.q){
       const all=[...(o.group1||[]),...(o.group2||[])];
-      return[o.seiban,o.client,o.product,...all.map(s=>machineName(s.machineId)),o.note].some(v=>(v||'').includes(S.q));
+      return[o.seiban,o.client,o.product,...all.map(s=>machineNamesFromIds(s.machineId)),o.note].some(v=>(v||'').includes(S.q));
     }
     return true;
   });
@@ -860,7 +980,7 @@ function buildList(){
     const map={};
     visible.forEach(o=>{
       const key=S.groupBy==='machine'
-        ?([...(o.group1||[]),...(o.group2||[])].map(s=>machineName(s.machineId)).filter(Boolean).join('・')||'機械未設定')
+        ?([...(o.group1||[]),...(o.group2||[])].map(s=>machineNamesFromIds(s.machineId)).filter(Boolean).join('・')||'機械未設定')
         :(o.deadline?`${o.deadline.slice(0,4)}年${parseInt(o.deadline.slice(5,7))}月`:'納期未設定');
       if(!map[key])map[key]=[];map[key].push(o);
     });
@@ -989,27 +1109,75 @@ function buildForm(){
 
   const renderGroupSteps=(gk,color,label)=>{
     const steps=f[gk]||[];
+    const allTypes=machineTypes();
     return`<div class="group-box ${gk}-box">
       <div class="group-label" style="color:${color}">
         <div style="width:4px;height:16px;background:${color};border-radius:2px"></div>
         ${label}
       </div>
       ${steps.map((s,i)=>{
-        const selMachine=machineOpts.replace(`value="${esc(s.machineId)}"`,`value="${esc(s.machineId)}" selected`);
         const selWorker=workerOpts.replace(`value="${esc(s.operatorId)}"`,`value="${esc(s.operatorId)}" selected`);
+        /* 【改修③】機械種別フィルタ + 複数選択 */
+        const selectedMids=parseMachineIds(s.machineId);
+        const filterTypes=Array.isArray(s._filterTypes)?s._filterTypes:[];
+        const selTypeSet=new Set(filterTypes);
+        /* 種別未選択 = 全機械を候補に */
+        const candidateMachines=(masters.machines||[]).filter(m=>{
+          if(selTypeSet.size===0)return true;
+          return selTypeSet.has(m.type||'');
+        });
+        const typeChips=allTypes.length>0
+          ?`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">
+              <span style="color:#64748b;font-size:10px;align-self:center">種別で絞込:</span>
+              ${allTypes.map(t=>`<button class="mc-type-chip" data-gk="${gk}" data-idx="${i}" data-type="${esc(t)}" style="background:${selTypeSet.has(t)?color:'#0d1117'};border:1px solid ${selTypeSet.has(t)?color:'#21262d'};color:${selTypeSet.has(t)?'#fff':'#94a3b8'};border-radius:99px;padding:3px 9px;font-size:10px;font-weight:700">${esc(t)}</button>`).join('')}
+              ${selTypeSet.size>0?`<button class="mc-type-clear" data-gk="${gk}" data-idx="${i}" style="background:#161b22;border:1px solid #ef444440;color:#f87171;border-radius:99px;padding:3px 9px;font-size:10px">クリア</button>`:''}
+            </div>`
+          :'';
+        const machineCheckboxes=candidateMachines.length===0
+          ?`<div style="color:#475569;font-size:11px;padding:6px">該当する機械がありません</div>`
+          :`<div style="display:flex;flex-wrap:wrap;gap:5px;max-height:120px;overflow-y:auto;padding:5px;background:#0d1117;border-radius:6px;border:1px solid #21262d">
+              ${candidateMachines.map(m=>{
+                const checked=selectedMids.includes(String(m.id));
+                return`<label class="mc-chk" style="display:flex;align-items:center;gap:4px;background:${checked?color+'22':'#161b22'};border:1px solid ${checked?color:'#21262d'};border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer">
+                  <input type="checkbox" class="mc-mid" data-gk="${gk}" data-idx="${i}" data-mid="${esc(m.id)}" ${checked?'checked':''} style="margin:0">
+                  <span style="color:${checked?'#fff':'#94a3b8'};font-weight:700">${esc(m.name)}</span>
+                  ${m.type?`<span style="color:#475569;font-size:9px">[${esc(m.type)}]</span>`:''}
+                </label>`;
+              }).join('')}
+            </div>`;
+        /* 【改修④】時間/個プルダウン（値×単位） */
+        const curHpu=s.hoursPerUnit;
+        const curUnit=s.hoursPerUnitUnit||'h';
+        const hpuOpts=HPU_VALUES.map(v=>`<option value="${v}" ${parseFloat(curHpu)===v?'selected':''}>${v}</option>`).join('');
         return`<div class="step-c">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
             <div style="background:${color};color:#fff;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:900">${i+1}</div>
             <input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="name" value="${esc(s.name||'')}" placeholder="工程名" style="flex:1;font-weight:700;border-color:#21262d">
             ${steps.length>1?`<button class="btn-xs" onclick="removeStepFromGroup('${gk}',${i})" style="color:#f87171;border-color:#ef444440">✕</button>`:''}
           </div>
+          <div style="margin-bottom:10px">
+            <label class="lbl">担当機械（複数選択可）</label>
+            ${typeChips}
+            ${machineCheckboxes}
+          </div>
           <div class="g2" style="gap:8px;margin-bottom:8px">
-            <div><label class="lbl">担当機械</label><select class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="machineId">${selMachine}</select></div>
             <div><label class="lbl">担当者</label><select class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="operatorId">${selWorker}</select></div>
+            <div><label class="lbl">同時台数（自動）</label><input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="machineCount" type="number" min="1" value="${Math.max(selectedMids.length,parseInt(s.machineCount)||1)}" style="text-align:center" readonly></div>
           </div>
           <div class="g3" style="gap:8px">
-            <div><label class="lbl">同時台数</label><input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="machineCount" type="number" min="1" value="${s.machineCount||1}" style="text-align:center"></div>
-            <div><label class="lbl">時間/個(h)</label><input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="hoursPerUnit" type="number" min="0" step="0.1" value="${s.hoursPerUnit||''}" placeholder="2.5"></div>
+            <div>
+              <label class="lbl">時間/個</label>
+              <div style="display:flex;gap:4px">
+                <select class="step-inp hpu-val" data-gk="${gk}" data-idx="${i}" style="flex:1">
+                  <option value="">未設定</option>
+                  ${hpuOpts}
+                </select>
+                <select class="step-inp hpu-unit" data-gk="${gk}" data-idx="${i}" style="width:60px">
+                  <option value="h" ${curUnit==='h'?'selected':''}>h</option>
+                  <option value="日" ${curUnit==='日'?'selected':''}>日</option>
+                </select>
+              </div>
+            </div>
             <div><label class="lbl">実績合計(h)</label><input class="step-inp" data-gk="${gk}" data-idx="${i}" data-field="actualHours" type="number" min="0" step="0.5" value="${s.actualHours||''}" placeholder="12.5"></div>
           </div>
         </div>`;
@@ -1142,7 +1310,7 @@ function buildDetail(){
       </div>${arrow}`;
     }
     const {s,gk,r,color}=n;
-    const mn=machineName(s.machineId);const wn=workerName(s.operatorId);
+    const mn=machineNamesFromIds(s.machineId);const wn=workerName(s.operatorId);
     const doneS=(parseInt(s.done)||0)>=qty&&qty>0;
     return`<div class="flow-node ${gk==='group1'?'g1':'g2'}" style="opacity:${doneS?.7:1}">
       <div style="font-size:10px;font-weight:700;color:${color};margin-bottom:4px">${esc(s.name)}</div>
@@ -1158,11 +1326,11 @@ function buildDetail(){
 
   const buildStepCard=(s,gk,i)=>{
     const r=qty>0?(parseInt(s.done)||0)/qty:0;const doneS=(parseInt(s.done)||0)>=qty&&qty>0;
-    const rem=Math.max(0,qty-(parseInt(s.done)||0));const h=parseFloat(s.hoursPerUnit)||0;const mc=Math.max(1,parseInt(s.machineCount)||1);
-    const mn=machineName(s.machineId);const wn=workerName(s.operatorId);
+    const rem=Math.max(0,qty-(parseInt(s.done)||0));const h=hpuToHours(s);const mc=Math.max(1,parseInt(s.machineCount)||1);
+    const mn=machineNamesFromIds(s.machineId);const wn=workerName(s.operatorId);
     return`<div class="card" style="border-color:${gk==='group1'?'#6366f1':'#06b6d4'}30;${doneS?'opacity:.6':''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="background:${gk==='group1'?'#6366f1':'#06b6d4'};color:#fff;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:900">${esc(s.name)}</span>
           ${mn?`<span style="color:#475569;font-size:11px">🔧${esc(mn)}</span>`:''}
           ${wn?`<span style="color:#475569;font-size:11px">👤${esc(wn)}</span>`:''}
@@ -1172,15 +1340,11 @@ function buildDetail(){
       ${bar(r,sc(r),10)}
       <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
         <span style="color:#64748b;font-size:12px">完了個数</span>
-        <input type="number" min="0" max="${qty}" value="${parseInt(s.done)||0}" class="step-prog" data-oid="${o.id}" data-gk="${gk}" data-sid="${s.id}" style="background:#0d1117;border:1px solid ${sc(r)}60;border-radius:7px;padding:7px 10px;font-size:18px;font-weight:900;width:76px;text-align:center;outline:none">
+        <input type="number" min="0" max="${qty}" value="${parseInt(s.done)||0}" class="step-prog" data-oid="${o.id}" data-gk="${gk}" data-sid="${s.id}" inputmode="numeric" style="background:#0d1117;border:1px solid ${sc(r)}60;border-radius:7px;padding:7px 10px;font-size:18px;font-weight:900;width:96px;text-align:center;outline:none">
         <span style="color:#334155;font-size:16px">/</span><span style="color:#64748b;font-size:15px">${qty}個</span>
         <span style="margin-left:auto;color:${sc(r)};font-weight:900;font-size:19px">${Math.round(r*100)}%</span>
       </div>
       ${h>0&&rem>0?`<div style="margin-top:6px;font-size:11px;color:#475569">残${rem}個 × ${hhmm(h)}${mc>1?` ÷ ${mc}台`:''} = <span style="color:#94a3b8;font-weight:700">${hhmm(h*rem/mc)}</span></div>`:''}
-      <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
-        <label style="color:#475569;font-size:10px;font-weight:700;white-space:nowrap">実績(h)</label>
-        <input type="number" min="0" step="0.5" value="${s.actualHours||''}" placeholder="実績時間" class="step-actual" data-oid="${o.id}" data-gk="${gk}" data-sid="${s.id}" style="max-width:100px;background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:5px 8px;font-size:12px;outline:none;color:#e2e8f0">
-      </div>
     </div>`;
   };
 
@@ -1516,6 +1680,315 @@ function buildDaily(){
 }
 
 /* ===== CALENDAR ===== */
+/* ===== ガントチャート (予定表) ===== */
+/* 【改修⑥】機械軸ガントチャート、ドラッグ&ドロップ、担当者表示 */
+
+/* 工程の所要日数を計算（バー長さ = ceil(qty * hpu(h) / (machineCount * dailyH)) ） */
+function calcStepDays(s,qty){
+  const dh=calcDailyH()||8;
+  if(dh<=0)return 1;
+  const hpu=hpuToHours(s);
+  if(hpu<=0||qty<=0)return 1;
+  const mids=parseMachineIds(s.machineId);
+  const mc=Math.max(parseInt(s.machineCount)||1,mids.length||1,1);
+  const days=Math.ceil((qty*hpu)/(mc*dh));
+  return Math.max(days,1);
+}
+
+/* 日付差(日数)を返す。負の値もありうる */
+function dayDiff(from,to){
+  try{
+    const a=new Date(from);const b=new Date(to);
+    if(isNaN(a)||isNaN(b))return 0;
+    return Math.round((b-a)/(1000*60*60*24));
+  }catch(e){return 0;}
+}
+
+/* 全予定バーをフラット化して取得
+   1工程あたり、選択された機械分のバーを生成 */
+function getScheduleBars(){
+  const bars=[];
+  const today=todayStr();
+  orders.forEach(o=>{
+    if(!S.schShowDone&&isDone(o))return;
+    const qty=parseInt(o.qty)||0;
+    ['group1','group2'].forEach(gk=>{
+      (o[gk]||[]).forEach(s=>{
+        const mids=parseMachineIds(s.machineId);
+        if(mids.length===0)return; /* 機械未設定はバー表示しない */
+        const start=s.scheduleStart||today;
+        const days=calcStepDays(s,qty);
+        mids.forEach(mid=>{
+          bars.push({
+            orderId:o.id, gk, stepId:s.id,
+            machineId:String(mid),
+            start, days,
+            order:o, step:s,
+            scheduleOperator:s.scheduleOperator||'',
+            scheduleOrder:s.scheduleOrder,
+          });
+        });
+      });
+    });
+  });
+  return bars;
+}
+
+/* バーを班でフィルタ。担当者(scheduleOperator)から班を判定。未定は全班に表示 */
+function filterBarsByTeam(bars,team){
+  if(team==='全班')return bars;
+  return bars.filter(b=>{
+    if(!b.scheduleOperator)return true; /* 未定は表示 */
+    const w=workerById(b.scheduleOperator);
+    return w&&w.team===team;
+  });
+}
+
+function buildSchedule(){
+  const teams=['全班',...TEAMS];
+  const periods=[[14,'2週間'],[30,'1ヶ月'],[90,'3ヶ月'],[180,'半年']];
+  const start=S.schStart||todayStr();
+  const days=S.schPeriod||30;
+  const dayHeaders=[];
+  for(let i=0;i<days;i++)dayHeaders.push(addDays(start,i));
+  const today=todayStr();
+
+  const allMachines=masters.machines||[];
+  if(allMachines.length===0){
+    return`<div class="up">
+      <div class="hdr">
+        <span style="font-weight:800;color:#e2e8f0">📅 予定表</span>
+      </div>
+      <div class="wrap">
+        <div class="card" style="text-align:center;padding:30px">
+          <p style="color:#94a3b8;font-size:14px;margin-bottom:8px">機械が登録されていません</p>
+          <p style="color:#475569;font-size:11px">設定 → 機械から機械を登録してください</p>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const allBars=getScheduleBars();
+  const bars=filterBarsByTeam(allBars,S.schTeam);
+
+  /* セル幅 */
+  const cellW=42;
+  const rowH=46;
+  const machineColW=110;
+
+  /* 各機械行のバーを集計 */
+  const barsByMachine={};
+  bars.forEach(b=>{
+    if(!barsByMachine[b.machineId])barsByMachine[b.machineId]=[];
+    barsByMachine[b.machineId].push(b);
+  });
+
+  /* 機械を type でグルーピング */
+  const machinesSorted=[...allMachines].sort((a,b)=>{
+    const ta=a.type||'zzz',tb=b.type||'zzz';
+    if(ta!==tb)return ta.localeCompare(tb);
+    return (a.name||'').localeCompare(b.name||'');
+  });
+
+  /* ヘッダー行（日付） */
+  const dayHeaderHTML=dayHeaders.map(d=>{
+    const dt=new Date(d);
+    const dow=['日','月','火','水','木','金','土'][dt.getDay()];
+    const isWeekend=dt.getDay()===0||dt.getDay()===6;
+    const isToday=d===today;
+    return`<div style="width:${cellW}px;flex-shrink:0;text-align:center;padding:4px 0;border-right:1px solid #21262d;background:${isToday?'#1e1b4b':isWeekend?'#161b22':'#0d1117'};color:${isToday?'#a78bfa':isWeekend?'#64748b':'#94a3b8'}">
+      <div style="font-size:9px;color:#475569">${dt.getMonth()+1}/${dt.getDate()}</div>
+      <div style="font-size:10px;font-weight:700">${dow}</div>
+    </div>`;
+  }).join('');
+
+  /* 機械行 */
+  const machineRows=machinesSorted.map(m=>{
+    const myBars=barsByMachine[String(m.id)]||[];
+    /* 各セル背景 */
+    const cellsBG=dayHeaders.map(d=>{
+      const dt=new Date(d);
+      const isWeekend=dt.getDay()===0||dt.getDay()===6;
+      const isToday=d===today;
+      return`<div class="sch-cell" data-mid="${esc(m.id)}" data-date="${d}" style="width:${cellW}px;flex-shrink:0;height:${rowH}px;border-right:1px solid #21262d;border-bottom:1px solid #21262d;background:${isToday?'#1e1b4b22':isWeekend?'#0d111780':'transparent'}"></div>`;
+    }).join('');
+    /* バー描画（左位置 = (start - viewStart) * cellW） */
+    const barsHTML=myBars.map(b=>{
+      const offset=dayDiff(start,b.start);
+      if(offset+b.days<0||offset>=days)return''; /* 表示範囲外 */
+      const left=Math.max(offset,0)*cellW;
+      const clipLeft=offset<0?Math.abs(offset):0;
+      const visibleDays=Math.min(b.days-clipLeft,days-Math.max(offset,0));
+      if(visibleDays<=0)return'';
+      const w=visibleDays*cellW-2;
+      const wn=workerName(b.scheduleOperator);
+      const opName=wn||'未定';
+      const teamColor=wn?(TEAM_COLORS[(workerById(b.scheduleOperator)||{}).team||'']||'#6366f1'):'#475569';
+      const qty=parseInt(b.order.qty)||0;
+      const done=isDone(b.order);
+      const overdue=b.order.deadline&&dayDiff(today,b.order.deadline)<0&&!done;
+      const bg=done?'linear-gradient(90deg,#052e1688,#10b98144)':overdue?'linear-gradient(90deg,#7f1d1d,#dc2626)':`linear-gradient(90deg,${teamColor},${teamColor}cc)`;
+      return`<div class="sch-bar" draggable="true"
+        data-oid="${b.orderId}" data-gk="${b.gk}" data-sid="${b.stepId}" data-mid="${esc(b.machineId)}"
+        style="position:absolute;left:${left}px;top:4px;width:${w}px;height:${rowH-8}px;background:${bg};border:1px solid ${teamColor};border-radius:5px;padding:3px 6px;font-size:10px;cursor:grab;color:#fff;overflow:hidden;display:flex;flex-direction:column;justify-content:center;z-index:5">
+        <div style="font-weight:800;font-size:10px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.order.product||b.order.seiban||'未設定')}×${qty}</div>
+        <div style="font-size:9px;line-height:1.1;color:#fff;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤${esc(opName)} ${esc(b.step.name||'')}</div>
+      </div>`;
+    }).join('');
+    return`<div class="sch-row" style="display:flex;align-items:stretch;border-bottom:1px solid #21262d;position:relative">
+      <div style="width:${machineColW}px;flex-shrink:0;padding:6px 8px;background:#0d1117;border-right:2px solid #30363d;display:flex;flex-direction:column;justify-content:center;position:sticky;left:0;z-index:10">
+        <div style="color:#e2e8f0;font-size:11px;font-weight:700;line-height:1.2">${esc(m.name)}</div>
+        ${m.type?`<div style="color:#475569;font-size:9px">${esc(m.type)}</div>`:''}
+      </div>
+      <div style="position:relative;display:flex">
+        ${cellsBG}
+        ${barsHTML}
+      </div>
+    </div>`;
+  }).join('');
+
+  /* 期間移動ボタン */
+  const navPrev=addDays(start,-Math.floor(days/2));
+  const navNext=addDays(start,Math.floor(days/2));
+  const startDate=new Date(start);
+  const periodLabel=`${startDate.getFullYear()}/${String(startDate.getMonth()+1).padStart(2,'0')}/${String(startDate.getDate()).padStart(2,'0')} 〜 ${addDays(start,days-1)}`;
+
+  /* バー編集モーダル */
+  let modal='';
+  if(S.schBarModal&&S.schBarRef){
+    const r=S.schBarRef;
+    const o=orders.find(x=>x.id==r.orderId);
+    const s=o?(o[r.gk]||[]).find(x=>x.id==r.stepId):null;
+    if(s){
+      const opOpts=`<option value="">未定</option>${(masters.workers||[]).map(w=>`<option value="${w.id}" ${s.scheduleOperator==w.id?'selected':''}>${esc(w.name)} (${esc(w.team||'-')})</option>`).join('')}`;
+      modal=`<div style="position:fixed;inset:0;background:#000a;z-index:200;display:flex;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeSchBarModal()">
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:14px;padding:18px;width:340px;max-width:96vw">
+          <h3 style="color:#e2e8f0;margin:0 0 12px;font-size:14px">📅 予定編集</h3>
+          <div style="background:#0d1117;border:1px solid #21262d;border-radius:7px;padding:8px;margin-bottom:10px">
+            <div style="color:#94a3b8;font-size:11px">${esc(o.product||o.seiban||'')} × ${parseInt(o.qty)||0}個</div>
+            <div style="color:#475569;font-size:10px;margin-top:2px">${esc(s.name||'')} / 🔧 ${esc(machineName(r.machineId))}</div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label class="lbl">担当者（予定）</label>
+            <select id="sch-op" style="width:100%">${opOpts}</select>
+          </div>
+          <div style="margin-bottom:10px">
+            <label class="lbl">開始日</label>
+            <input id="sch-start" type="date" value="${esc(s.scheduleStart||todayStr())}" style="width:100%">
+          </div>
+          <div style="margin-bottom:14px">
+            <label class="lbl">加工順序（同一機械内）</label>
+            <input id="sch-order" type="number" min="0" value="${s.scheduleOrder||0}" style="width:100%">
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="closeSchBarModal()" class="btn-d" style="flex:1">キャンセル</button>
+            <button onclick="saveSchBarEdit()" class="btn-p" style="flex:2">保存</button>
+          </div>
+        </div>
+      </div>`;
+    }
+  }
+
+  return`<div class="up">
+    <div class="hdr">
+      <span style="font-weight:800;color:#e2e8f0">📅 予定表</span>
+      <button onclick="set({schShowDone:!S.schShowDone})" style="background:${S.schShowDone?'#052e16':'#161b22'};border:1px solid ${S.schShowDone?'#10b98150':'#21262d'};border-radius:7px;color:${S.schShowDone?'#10b981':'#64748b'};padding:5px 10px;font-size:11px;font-weight:700">${S.schShowDone?'✅完了含む':'完了を隠す'}</button>
+    </div>
+    <div class="wrap">
+      <div class="card" style="padding:8px;margin-bottom:10px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          ${teams.map(t=>`<button onclick="set({schTeam:'${t}'})" style="background:${S.schTeam===t?'linear-gradient(135deg,#4f46e5,#7c3aed)':'#0d1117'};border:1px solid ${S.schTeam===t?'#6366f1':'#21262d'};border-radius:7px;color:${S.schTeam===t?'#fff':'#94a3b8'};padding:6px 12px;font-size:11px;font-weight:700">${t}</button>`).join('')}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button onclick="set({schStart:'${navPrev}'})" style="background:#0d1117;border:1px solid #21262d;border-radius:6px;color:#94a3b8;padding:5px 10px;font-size:11px">◀</button>
+          <span style="color:#94a3b8;font-size:11px;flex:1;text-align:center;min-width:140px">${periodLabel}</span>
+          <button onclick="set({schStart:'${navNext}'})" style="background:#0d1117;border:1px solid #21262d;border-radius:6px;color:#94a3b8;padding:5px 10px;font-size:11px">▶</button>
+          <select onchange="set({schPeriod:parseInt(this.value)})" style="background:#0d1117;border:1px solid #21262d;border-radius:6px;color:#94a3b8;padding:5px 8px;font-size:11px">
+            ${periods.map(([d,l])=>`<option value="${d}" ${S.schPeriod==d?'selected':''}>${l}</option>`).join('')}
+          </select>
+          <button onclick="set({schStart:'${today}'})" style="background:#1e1b4b;border:1px solid #4338ca;border-radius:6px;color:#a78bfa;padding:5px 10px;font-size:11px;font-weight:700">本日</button>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="overflow-x:auto">
+          <div style="display:flex;border-bottom:2px solid #30363d;background:#0d1117;position:sticky;top:0;z-index:11">
+            <div style="width:${machineColW}px;flex-shrink:0;padding:6px 8px;color:#94a3b8;font-size:11px;font-weight:700;border-right:2px solid #30363d;position:sticky;left:0;background:#0d1117;z-index:12">機械</div>
+            ${dayHeaderHTML}
+          </div>
+          ${machineRows}
+        </div>
+      </div>
+      <div class="card" style="padding:8px;margin-top:8px">
+        <p style="color:#475569;font-size:10px;margin:0">💡 バーをタップで編集 / 別の機械行へドラッグで移動 / 同一機械行内をドラッグで開始日変更</p>
+        <p style="color:#475569;font-size:10px;margin-top:4px">👤 担当者の班に応じて色分けされます。担当者未定（灰色）は全班に表示されます。</p>
+      </div>
+    </div>
+    ${modal}
+  </div>`;
+}
+
+/* 予定表のバークリック・ドラッグハンドラ */
+window.openSchBarModal=(oid,gk,sid,mid)=>{
+  S.schBarRef={orderId:oid,gk,stepId:sid,machineId:mid};
+  S.schBarModal=true;render();
+};
+window.closeSchBarModal=()=>{S.schBarModal=false;S.schBarRef=null;render();};
+window.saveSchBarEdit=async()=>{
+  const r=S.schBarRef;if(!r)return;
+  try{
+    const opEl=document.getElementById('sch-op');
+    const stEl=document.getElementById('sch-start');
+    const orEl=document.getElementById('sch-order');
+    const newOp=opEl?opEl.value:'';
+    const newStart=stEl?stEl.value:'';
+    const newOrder=orEl?(orEl.value===''?'':parseInt(orEl.value)||0):'';
+    orders=orders.map(o=>{
+      if(o.id!=r.orderId)return o;
+      const newG=(o[r.gk]||[]).map(s=>{
+        if(s.id!=r.stepId)return s;
+        return{...s,scheduleOperator:newOp,scheduleStart:newStart,scheduleOrder:newOrder};
+      });
+      return{...o,[r.gk]:newG};
+    });
+    persist();
+    S.schBarModal=false;S.schBarRef=null;render();
+  }catch(e){alert('保存エラー: '+e.message);}
+};
+
+/* バーのドラッグ&ドロップ：同一機械内→開始日変更、別機械→machineId入替 */
+let _schDrag=null;
+window.onSchBarDragStart=(e,oid,gk,sid,mid)=>{
+  _schDrag={orderId:oid,gk,stepId:sid,machineId:mid};
+  try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain','sch');}catch(_){}
+};
+window.onSchCellDragOver=e=>{e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(_){}};
+window.onSchCellDrop=(e,targetMid,targetDate)=>{
+  e.preventDefault();
+  const d=_schDrag;_schDrag=null;
+  if(!d)return;
+  try{
+    orders=orders.map(o=>{
+      if(o.id!=d.orderId)return o;
+      const newG=(o[d.gk]||[]).map(s=>{
+        if(s.id!=d.stepId)return s;
+        const next={...s,scheduleStart:targetDate};
+        if(targetMid!==d.machineId){
+          /* 機械を入れ替え：machineIds配列の中で d.machineId を targetMid に置換 */
+          const ids=parseMachineIds(s.machineId);
+          const idx=ids.indexOf(String(d.machineId));
+          if(idx>=0)ids[idx]=String(targetMid);
+          else if(!ids.includes(String(targetMid)))ids.push(String(targetMid));
+          /* 重複排除 */
+          next.machineId=stringifyMachineIds(Array.from(new Set(ids)));
+        }
+        return next;
+      });
+      return{...o,[d.gk]:newG};
+    });
+    persist();render();
+  }catch(err){console.error('drop error:',err);alert('変更失敗: '+err.message);}
+};
+
 function buildCalendar(){
   const y=S.calYear,m=S.calMonth;
   const monthName=`${y}年${m+1}月`;
@@ -1745,6 +2218,24 @@ function bindEvents(){
     on('login-btn','click',tryLogin);
     on('back-btn','click',()=>set({view:'list'}));
     on('lock-btn','click',()=>set({locked:true,pw:'',pwErr:false}));
+    /* 【改修⑥】ガントチャートのバー操作 */
+    document.querySelectorAll('.sch-bar').forEach(bar=>{
+      const oid=parseInt(bar.dataset.oid);
+      const gk=bar.dataset.gk;
+      const sid=parseInt(bar.dataset.sid);
+      const mid=bar.dataset.mid;
+      bar.addEventListener('click',e=>{
+        e.stopPropagation();
+        openSchBarModal(oid,gk,sid,mid);
+      });
+      bar.addEventListener('dragstart',e=>onSchBarDragStart(e,oid,gk,sid,mid));
+    });
+    document.querySelectorAll('.sch-cell').forEach(cell=>{
+      const targetMid=cell.dataset.mid;
+      const targetDate=cell.dataset.date;
+      cell.addEventListener('dragover',onSchCellDragOver);
+      cell.addEventListener('drop',e=>onSchCellDrop(e,targetMid,targetDate));
+    });
     on('new-btn','click',goNew);
     on('new-btn2','click',goNew);
     on('submit-btn','click',saveOrder);
@@ -1799,15 +2290,68 @@ function bindEvents(){
     document.querySelectorAll('.step-inp').forEach(el=>{
       el.addEventListener('input',e=>{
         const gk=e.target.dataset.gk;const idx=parseInt(e.target.dataset.idx);const field=e.target.dataset.field;
+        if(!field)return; /* hpu-val/hpu-unit はchangeで処理 */
         const steps=[...(S.form[gk]||[])];steps[idx]={...steps[idx],[field]:e.target.value};
         S.form={...S.form,[gk]:steps};
       });
       el.addEventListener('change',e=>{
-        const gk=e.target.dataset.gk;const idx=parseInt(e.target.dataset.idx);const field=e.target.dataset.field;
-        const steps=[...(S.form[gk]||[])];steps[idx]={...steps[idx],[field]:e.target.value};
+        const gk=e.target.dataset.gk;const idx=parseInt(e.target.dataset.idx);
+        const steps=[...(S.form[gk]||[])];
+        /* 【改修④】時間/個 値変更 */
+        if(e.target.classList.contains('hpu-val')){
+          const v=e.target.value;
+          steps[idx]={...steps[idx],hoursPerUnit:v===''?'':parseFloat(v)};
+          S.form={...S.form,[gk]:steps};
+          return;
+        }
+        /* 【改修④】時間/個 単位変更（h↔日） */
+        if(e.target.classList.contains('hpu-unit')){
+          steps[idx]={...steps[idx],hoursPerUnitUnit:e.target.value};
+          S.form={...S.form,[gk]:steps};
+          return;
+        }
+        const field=e.target.dataset.field;
+        if(!field)return;
+        steps[idx]={...steps[idx],[field]:e.target.value};
         S.form={...S.form,[gk]:steps};
       });
       el.addEventListener('focus',e=>{if(e.target.type==='number')e.target.select();});
+    });
+    /* 【改修③】機械種別チップ（複数トグル） */
+    document.querySelectorAll('.mc-type-chip').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        const gk=e.target.dataset.gk;const idx=parseInt(e.target.dataset.idx);const t=e.target.dataset.type;
+        const steps=[...(S.form[gk]||[])];
+        const cur=Array.isArray(steps[idx]._filterTypes)?[...steps[idx]._filterTypes]:[];
+        const i=cur.indexOf(t);
+        if(i>=0)cur.splice(i,1);else cur.push(t);
+        steps[idx]={...steps[idx],_filterTypes:cur};
+        S.form={...S.form,[gk]:steps};
+        render();
+      });
+    });
+    document.querySelectorAll('.mc-type-clear').forEach(btn=>{
+      btn.addEventListener('click',e=>{
+        const gk=e.target.dataset.gk;const idx=parseInt(e.target.dataset.idx);
+        const steps=[...(S.form[gk]||[])];
+        steps[idx]={...steps[idx],_filterTypes:[]};
+        S.form={...S.form,[gk]:steps};
+        render();
+      });
+    });
+    /* 【改修③】機械チェックボックス（複数選択） */
+    document.querySelectorAll('.mc-mid').forEach(chk=>{
+      chk.addEventListener('change',e=>{
+        const gk=e.target.dataset.gk;const idx=parseInt(e.target.dataset.idx);const mid=e.target.dataset.mid;
+        const steps=[...(S.form[gk]||[])];
+        const cur=parseMachineIds(steps[idx].machineId);
+        const set=new Set(cur);
+        if(e.target.checked)set.add(mid);else set.delete(mid);
+        const newIds=Array.from(set);
+        steps[idx]={...steps[idx],machineId:stringifyMachineIds(newIds),machineCount:Math.max(newIds.length,1)};
+        S.form={...S.form,[gk]:steps};
+        render();
+      });
     });
     /* 【指摘C修正】日付プルダウンの変更をS.formに即座に反映 */
     document.querySelectorAll('.date-sel').forEach(sel=>{
